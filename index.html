@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#101c35">
+<meta name="description" content="SimVest — model your business, compare scenarios and understand your finances before you commit capital.">
+<title>SimVest — Business Simulation Studio</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<div id="app" class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="brandmark"><span></span><span></span><span></span></span><span>simvest<small>BUSINESS SIMULATOR</small></span></div>
+    <div class="nav-caption">WORKSPACE</div>
+    <nav id="mainNav" aria-label="Main navigation">
+      <button class="nav-item active" data-view="overview"><span class="nav-ico">▦</span> Overview</button>
+      <button class="nav-item" data-view="setup"><span class="nav-ico">◫</span> Business setup</button>
+      <button class="nav-item" data-view="simulation"><span class="nav-ico">⌁</span> Simulation</button>
+      <button class="nav-item" data-view="scenarios"><span class="nav-ico">⑃</span> Scenarios</button>
+      <button class="nav-item" data-view="reports"><span class="nav-ico">▤</span> Reports & exports</button>
+      <button class="nav-item" data-view="saved"><span class="nav-ico">◷</span> Saved projects</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="status-card"><span class="status-pulse"></span> Demonstration model <small>Editable assumptions · No live data</small></div>
+      <div class="side-foot">SimVest Studio <span>v0.2 • Local MVP</span></div>
+    </div>
+  </aside>
+  <div class="shell">
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">☰</button>
+      <div class="breadcrumbs"><span>Workspace</span><b>/</b><strong id="crumb">Overview</strong></div>
+      <div class="top-actions"><span class="top-tag">🇳🇬 Nigeria</span><button class="btn btn-quiet" id="newProjectTop">+ New project</button><button class="btn btn-primary btn-small" id="saveTop">Save project</button></div>
+    </header>
+    <main id="viewRoot" tabindex="-1" aria-live="polite"></main>
+  </div>
+  <div class="mobile-scrim" id="mobileScrim"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<script src="app.js"></script>
+</body></html>

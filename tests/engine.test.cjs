@@ -1,26 +1,279 @@
-const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const all={};for(const id of ['viewRoot','sidebar','mobileScrim','crumb','toast','mainNav','menuToggle','newProjectTop','saveTop']){all[id]={innerHTML:'',textContent:'',classList:{add(){},remove(){},toggle(){}},addEventListener(){}};}
-const memory={};const localStorage={getItem:k=>memory[k]??null,setItem:(k,v)=>memory[k]=v};
-const doc={getElementById:k=>all[k]||null,querySelectorAll:()=>[]};
-const win={localStorage,scrollTo(){}}; const ctx={window:win,document:doc,localStorage,Date,Math,Number,JSON,Array,String,Object,console,clearTimeout,setTimeout};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../app.js'),'utf8'),ctx);
-const {projection,newProject,stats,types,scenarios}=win.SimVestDemo;
-assert.equal(Object.keys(types).length,3,'all three Phase 1 modules exist');
-const f=newProject('food'),base=projection(f,scenarios.base);assert.equal(base.length,12);
-assert.equal(base[0].units,45*26);assert.equal(base[0].revenue,45*26*2700);
-assert.equal(base[0].cogs,45*26*1200);assert.equal(base[0].interest,1200000*.18/12);
-assert.equal(base[0].profit,base[0].revenue-base[0].cogs-base[0].fixed-base[0].interest);
-assert.equal(base[0].cash,f.finance.funds-f.finance.setupCost+base[0].profit-f.finance.principal);
-assert.equal(base[0].debt,1200000-80000);
-assert.equal(base[0].openingCash,2500000);assert(base[11].debt>=0);
-const drop=projection(f,scenarios.demand),costs=projection(f,scenarios.costs);
-assert.equal(drop[0].revenue,base[0].revenue);assert(drop[3].revenue<base[3].revenue);assert(costs[3].profit<base[3].profit);
-for(const type of Object.keys(types)){
- const p=newProject(type);p.period=36;p.ops.sales=10000;p.ops.capacity=80;
- const rows=projection(p,scenarios.base);assert.equal(rows.length,36);assert.equal(rows[0].units,80*p.ops.days);
- assert(rows.every(r=>Object.values(r).filter(v=>typeof v==='number').every(Number.isFinite)));
-}
-const zeroDebt=newProject('retail');zeroDebt.finance.debt=0;const debtRows=projection(zeroDebt,scenarios.base);assert(debtRows.every(r=>r.debt===0&&r.interest===0&&r.principal===0));
-assert(all.viewRoot.innerHTML.includes('Business performance forecast'),'overview rendered');
-assert(stats(base,f).last===base.at(-1));
-console.log('PASS: 3 modules, forecasts, revenue, costs, loans, scenario shocks, capacity and DOM initialization');
+
+/* SimVest economic data v0.5
+   User imports are NOT independently verified.
+*/
+
+window.SimVestData = (() => {
+  'use strict';
+
+  const KEY = 'simvest_economic_v05';
+  const ALLOWED = new Set([
+    'cpi_mom',
+    'cpi_yoy',
+    'fx_ngn_usd',
+    'petrol_ngn_litre'
+  ]);
+
+  let state;
+
+  try {
+    state = JSON.parse(localStorage.getItem(KEY)) || {};
+  } catch {
+    state = {};
+  }
+
+  state.records = Array.isArray(state.records)
+    ? state.records
+    : [];
+
+  state.annual = state.annual &&
+    typeof state.annual === 'object'
+    ? state.annual
+    : {};
+
+  const save = () => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch {}
+  };
+
+  const validMonth = m =>
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(m);
+
+  function get(metric, month) {
+    return state.records.find(
+      r => r.metric === metric && r.month === month
+    )?.value;
+  }
+
+  function previous(month) {
+    const [y, m] = month.split('-').map(Number);
+    return new Date(
+      Date.UTC(y, m - 2, 1)
+    ).toISOString().slice(0, 7);
+  }
+
+  function changes(
+    month,
+    fallbackAnnualPct,
+    fxShare = 0,
+    fuelShare = 0
+  ) {
+    const monthly = get('cpi_mom', month);
+
+    const annual =
+      get('cpi_yoy', month) ??
+      state.annual[month.slice(0, 4)];
+
+    const inflation = monthly !== undefined
+      ? monthly / 100
+      : Math.pow(
+          1 + Math.max(
+            -95,
+            annual ?? fallbackAnnualPct
+          ) / 100,
+          1 / 12
+        ) - 1;
+
+    function ratio(metric) {
+      const now = get(metric, month);
+      const prior = get(metric, previous(month));
+
+      return now > 0 && prior > 0
+        ? now / prior - 1
+        : null;
+    }
+
+    const fx = ratio('fx_ngn_usd');
+    const fuel = ratio('petrol_ngn_litre');
+
+    const fxWeight = Math.min(
+      1,
+      Math.max(0, fxShare / 100)
+    );
+
+    const fuelWeight = Math.min(
+      1 - fxWeight,
+      Math.max(0, fuelShare / 100)
+    );
+
+    const otherWeight =
+      1 - fxWeight - fuelWeight;
+
+    const procurementFactor = Math.max(
+      0.1,
+      1 +
+        otherWeight * inflation +
+        fxWeight * (fx ?? 0) +
+        fuelWeight * (fuel ?? 0)
+    );
+
+    return {
+      inflation,
+      procurementFactor,
+      fixedFactor: Math.max(
+        0.1,
+        1 + inflation
+      ),
+
+      cpiStatus:
+        monthly !== undefined
+          ? 'monthly observation'
+          : annual !== undefined
+          ? 'annual-equivalent estimate'
+          : 'manual assumption',
+
+      fxStatus:
+        fx === null
+          ? 'missing: no FX shock applied'
+          : 'historical change applied',
+
+      fuelStatus:
+        fuel === null
+          ? 'missing: no fuel shock applied'
+          : 'historical change applied'
+    };
+  }
+
+  function importCSV(csv) {
+    const lines = csv.trim()
+      .split(/\r?\n/)
+      .filter(Boolean);
+
+    const headers = lines.shift()
+      .split(',')
+      .map(x => x.trim().toLowerCase());
+
+    for (const h of [
+      'metric',
+      'month',
+      'value',
+      'source'
+    ]) {
+      if (!headers.includes(h)) {
+        throw Error('Missing CSV column: ' + h);
+      }
+    }
+
+    if (lines.length > 5000) {
+      throw Error('Import no more than 5,000 rows at once');
+    }
+
+    const incoming = lines.map((line, i) => {
+      const values = line.split(',')
+        .map(x => x.trim());
+
+      if (values.length !== headers.length) {
+        throw Error('Invalid CSV at row ' + (i + 2));
+      }
+
+      const raw = Object.fromEntries(
+        headers.map((h, j) => [h, values[j]])
+      );
+
+      const value = Number(raw.value);
+
+      if (
+        !ALLOWED.has(raw.metric) ||
+        !validMonth(raw.month) ||
+        raw.value === '' ||
+        !Number.isFinite(value) ||
+        !raw.source
+      ) {
+        throw Error('Invalid data on row ' + (i + 2));
+      }
+
+      if (
+        ['fx_ngn_usd', 'petrol_ngn_litre']
+          .includes(raw.metric) &&
+        value <= 0
+      ) {
+        throw Error(
+          'Prices must be positive (row ' + (i + 2) + ')'
+        );
+      }
+
+      return {
+        metric: raw.metric,
+        month: raw.month,
+        value,
+        source: raw.source
+      };
+    });
+
+    const merged = new Map(
+      state.records.map(r => [
+        r.metric + '|' + r.month,
+        r
+      ])
+    );
+
+    for (const r of incoming) {
+      merged.set(r.metric + '|' + r.month, r);
+    }
+
+    state.records = [...merged.values()].sort(
+      (a, b) => a.month.localeCompare(b.month)
+    );
+
+    save();
+    return incoming.length;
+  }
+
+  async function fetchWorldBank() {
+    const url =
+      'https://api.worldbank.org/v2/country/NG/indicator/FP.CPI.TOTL.ZG?format=json&per_page=150';
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw Error(
+        'World Bank API responded with ' +
+        response.status
+      );
+    }
+
+    const json = await response.json();
+
+    if (!Array.isArray(json[1])) {
+      throw Error('Unexpected World Bank response');
+    }
+
+    const annual = {};
+
+    for (const row of json[1]) {
+      if (
+        row.value !== null &&
+        Number.isFinite(Number(row.value))
+      ) {
+        annual[row.date] = Number(row.value);
+      }
+    }
+
+    state.annual = annual;
+    save();
+
+    return Object.keys(annual).length;
+  }
+
+  function clear() {
+    state.records = [];
+    save();
+  }
+
+  function status() {
+    return {
+      records: state.records.length,
+      years: Object.keys(state.annual).length
+    };
+  }
+
+  return {
+    get,
+    changes,
+    importCSV,
+    fetchWorldBank,
+    clear,
+    status
+  };
+})();

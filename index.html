@@ -2,51 +2,2480 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#14213b">
-  <title>SimVest | Business Simulation Studio</title>
-  <link rel="stylesheet" href="styles.css">
-  <script defer src="economic-data.js"></script>
-  <script defer src="app.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111e37">
+<title>SimVest | Retail Simulation & Validation</title>
+<style>
+:root {
+  font-family: Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  color:#1c2b47;background:#f4f6fb;
+}
+*{box-sizing:border-box}
+body{margin:0}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+.layout{
+  display:grid;grid-template-columns:248px minmax(0,1fr);
+  min-height:100vh;
+}
+.sidebar{
+  background:#111e37;color:#d4ddf0;padding:27px 17px;
+  display:flex;flex-direction:column;gap:29px;
+}
+.brand{
+  font-size:27px;letter-spacing:-1px;color:white;
+  font-weight:850;padding-left:10px;
+}
+.brand b{color:#8ea7ff}
+.brand small{
+  display:block;color:#899bb7;font-size:10px;
+  font-weight:650;letter-spacing:1.8px;
+  padding:3px 0 0 27px;
+}
+.aside-title{
+  font-size:10px;color:#7f94b5;letter-spacing:1.4px;
+  margin:0 10px 8px;font-weight:800;
+}
+.nav{display:grid;gap:5px}
+.nav button{
+  width:100%;border:0;color:#b7c5df;
+  background:transparent;border-radius:10px;
+  text-align:left;padding:12px;font-size:13px;font-weight:680;
+}
+.nav button:hover,.nav button.active{
+  background:#293f68;color:#fff;
+}
+.nav button i{
+  font-style:normal;display:inline-block;
+  width:28px;font-size:16px;
+}
+.side-foot{
+  margin-top:auto;color:#8a9bb9;font-size:11px;
+  line-height:1.65;padding:10px;
+}
+.main{min-width:0}
+.top{
+  height:70px;background:white;
+  border-bottom:1px solid #e3e9f3;
+  display:flex;justify-content:space-between;
+  align-items:center;gap:12px;padding:0 28px;font-size:13px;
+}
+.top .crumb{color:#7c8da7}
+.top-actions{display:flex;align-items:center;gap:10px}
+.content{max-width:1400px;margin:auto;padding:29px}
+.menu-btn{
+  display:none;border:0;background:transparent;
+  color:#203453;font-size:20px;
+}
+h1{font-size:29px;letter-spacing:-1.1px;margin:2px 0 7px}
+h2{font-size:16px;letter-spacing:-.2px;margin:0 0 16px}
+h3{font-size:14px;margin:0 0 9px}
+.small{
+  font-size:12px;color:#74849e;line-height:1.6;
+}
+.eyebrow{
+  font-size:10px;font-weight:850;color:#536ee9;
+  letter-spacing:1.25px;text-transform:uppercase;
+}
+.heading{
+  display:flex;flex-wrap:wrap;align-items:flex-start;
+  justify-content:space-between;gap:14px;margin-bottom:23px;
+}
+.heading p{
+  margin:0;color:#74849b;line-height:1.55;font-size:13px;
+}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:6px;border-radius:9px;padding:10px 14px;
+  font-weight:750;font-size:12px;color:#25395b;
+  border:1px solid #dbe3f1;background:white;
+}
+.btn:hover{filter:brightness(.97)}
+.btn.primary{
+  background:#526aea;border-color:#526aea;color:white;
+}
+.btn.red{color:#b84053}
+.btn.sm{padding:8px 10px}
+.chip{
+  padding:8px 11px;background:#f1f4fb;
+  border-radius:8px;font-size:12px;
+}
+.badge{
+  display:inline-block;background:#ecf0ff;
+  color:#3f5fc3;padding:5px 9px;border-radius:99px;
+  font-size:11px;font-weight:800;
+}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.card{
+  background:white;border:1px solid #e2e8f2;
+  border-radius:15px;box-shadow:0 5px 20px #17315d07;
+}
+.pad{padding:22px}
+.grid{display:grid;gap:16px}
+.kpis{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  margin-bottom:17px;
+}
+.kpi{padding:19px;min-width:0}
+.kpi label{
+  display:block;color:#75869f;font-size:12px;font-weight:700;
+}
+.kpi strong{
+  display:block;margin-top:10px;font-size:24px;
+  letter-spacing:-.8px;overflow-wrap:anywhere;
+}
+.kpi small{
+  display:block;color:#8b9aaf;margin-top:6px;font-size:11px;
+}
+.two{
+  grid-template-columns:minmax(0,1.65fr) minmax(275px,.9fr);
+}
+.section{margin-top:16px}
+.form{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:15px;
+}
+.field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.field label{
+  font-size:12px;color:#324661;font-weight:750;
+}
+.field input,.field select,.field textarea{
+  width:100%;border:1px solid #d9e1ef;border-radius:9px;
+  padding:11px 12px;color:#233652;background:white;min-width:0;
+}
+.field textarea{
+  min-height:155px;resize:vertical;
+  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-size:12px;line-height:1.5;
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:2px solid #adbbff;border-color:#5a70e7;
+}
+.stack{display:grid;gap:16px}
+.inline{
+  display:flex;justify-content:space-between;
+  align-items:center;gap:10px;flex-wrap:wrap;
+}
+.notice{
+  border:1px solid #dbe5ff;background:#f0f3ff;
+  color:#526789;border-radius:10px;padding:13px 15px;
+  font-size:12px;line-height:1.6;
+}
+.notice.warn{
+  background:#fff8eb;border-color:#f1e1b7;color:#856525;
+}
+.line{
+  border:0;border-top:1px solid #e6ebf5;margin:18px 0;
+}
+.chart{height:260px}
+.chart svg{width:100%;height:100%}
+.chart text{font-size:11px;fill:#8391a9}
+.legend{
+  display:flex;gap:20px;align-items:center;
+  font-size:12px;color:#74849e;margin-top:10px;flex-wrap:wrap;
+}
+.dot{
+  display:inline-block;width:10px;height:10px;
+  border-radius:50%;margin-right:6px;background:#536ce5;
+}
+.dot.actual{background:#11a18e}
+.tablewrap{
+  border:1px solid #e4eaf3;border-radius:10px;overflow:auto;
+}
+table{
+  width:100%;border-collapse:collapse;
+  min-width:690px;font-size:12px;
+}
+th,td{
+  padding:12px;text-align:right;
+  border-bottom:1px solid #edf1f6;white-space:nowrap;
+}
+th{background:#f7f9fd;color:#6b7f9b}
+td:first-child,th:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+.scenario-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+.scenario{
+  border:1px solid #dce4f0;border-radius:12px;
+  background:white;text-align:left;padding:16px;min-height:106px;
+}
+.scenario.selected{
+  border:2px solid #536ce5;background:#f3f5ff;padding:15px;
+}
+.scenario strong{font-size:13px}
+.scenario p{
+  color:#74849e;font-size:11px;
+  line-height:1.5;margin:8px 0 0;
+}
+.savedrow{
+  border:1px solid #e6ebf4;border-radius:10px;padding:13px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;
+}
+.empty{
+  text-align:center;color:#8392ac;padding:38px 15px;
+  border:1px dashed #cad4e5;border-radius:12px;
+  line-height:1.6;font-size:13px;
+}
+.pills{display:flex;gap:7px;flex-wrap:wrap}
+.pill{
+  border:1px solid #dce4ef;background:white;
+  border-radius:8px;padding:9px 12px;
+  font-size:12px;font-weight:700;
+}
+.pill.active{
+  background:#edf1ff;border-color:#6579ec;color:#3652ca;
+}
+.toast{
+  position:fixed;bottom:20px;right:20px;
+  background:#122139;color:white;border-radius:10px;
+  padding:13px 17px;font-size:12px;opacity:0;
+  pointer-events:none;transition:opacity .2s;z-index:30;
+}
+.toast.visible{opacity:1}
+code{
+  font-size:.92em;background:#f0f3f8;
+  border-radius:3px;padding:2px 3px;
+}
+@media(max-width:1100px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two{grid-template-columns:1fr}
+  .scenario-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:760px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .sidebar.open{
+    display:flex;position:fixed;left:0;top:0;bottom:0;
+    width:255px;z-index:25;box-shadow:0 0 0 100vw #13223c88;
+  }
+  .menu-btn{display:inline-block}
+  .top{padding:0 14px}
+  .content{padding:22px 13px}
+  .pad{padding:16px}
+  .form{grid-template-columns:1fr}
+  .kpi{padding:15px}
+  .kpi strong{font-size:20px}
+  .chip{display:none}
+  .scenario-grid{grid-template-columns:1fr 1fr}
+  h1{font-size:25px}
+}
+@media print{
+  .sidebar,.top,.btn,.actions{display:none!important}
+  .layout{display:block}
+  .content{padding:9px}
+  .card{box-shadow:none}
+}
+</style>
 </head>
+
 <body>
-  <div class="layout">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand">
-        <span class="brand-icon">◆</span> simvest
-        <small>BUSINESS SIMULATOR</small>
-      </div>
-      <p class="side-label">WORKSPACE</p>
-      <nav id="navigation" aria-label="Main navigation">
-        <button class="nav-link active" data-page="dashboard">▦ &nbsp; Dashboard</button>
-        <button class="nav-link" data-page="setup">◫ &nbsp; Business setup</button>
-        <button class="nav-link" data-page="simulation">⌁ &nbsp; Simulation</button>
-        <button class="nav-link" data-page="scenarios">⑃ &nbsp; Scenarios</button>
-        <button class="nav-link" data-page="data">◉ &nbsp; Economic data</button>
-        <button class="nav-link" data-page="saved">◷ &nbsp; Saved projects</button>
-      </nav>
-      <div class="side-note">
-        SimVest • Retail & Commerce
-        <br>
-        Prototype simulation, not financial advice.
-      </div>
-    </aside>
-    <div class="workspace">
-      <header class="topbar">
-        <div>
-          <button class="menu" id="menuButton" aria-label="Open menu">☰</button>
-          <strong>Workspace</strong>
-          <span class="muted">/ <span id="pageTitle">Dashboard</span></span>
-        </div>
-        <div class="top-actions">
-          <span class="chip">🇳🇬 Nigeria</span>
-          <button class="btn primary" id="saveButton">Save project</button>
-        </div>
-      </header>
-      <main id="content" class="content"></main>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <b>◆</b> simvest
+      <small>BUSINESS SIMULATOR</small>
     </div>
+    <div>
+      <div class="aside-title">WORKSPACE</div>
+      <nav class="nav" id="navigation">
+        <button data-page="dashboard" class="active">
+          <i>▦</i> Dashboard
+        </button>
+        <button data-page="setup">
+          <i>◫</i> Business setup
+        </button>
+        <button data-page="simulation">
+          <i>⌁</i> Simulation
+        </button>
+        <button data-page="scenarios">
+          <i>⑃</i> Scenarios
+        </button>
+        <button data-page="validation">
+          <i>◉</i> Model validation
+        </button>
+        <button data-page="data">
+          <i>↗</i> Economic data
+        </button>
+        <button data-page="saved">
+          <i>◷</i> Saved projects
+        </button>
+      </nav>
+    </div>
+    <div class="side-foot">
+      SimVest • Retail & Commerce
+      <p>Working prototype. Results are not validated financial advice.</p>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div>
+        <button class="menu-btn" id="menuButton"
+          aria-label="Toggle navigation">☰</button>
+        <strong>Workspace</strong>
+        <span class="crumb">
+          / <span id="pageTitle">Dashboard</span>
+        </span>
+      </div>
+      <div class="top-actions">
+        <span class="chip">🇳🇬 Nigeria</span>
+        <button class="btn primary sm" id="saveButton">
+          Save project
+        </button>
+      </div>
+    </header>
+    <main id="content" class="content"></main>
   </div>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<div class="toast" id="toast" role="status"
+  aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+
+// =======================================
+// SIMVEST DATA STORAGE
+// =======================================
+
+const $ = id => document.getElementById(id);
+
+const DRAFT = "simvest_draft_v05";
+const SAVED = "simvest_projects_v05";
+const ECON = "simvest_economic_v05";
+const ACTUAL = "simvest_actual_v06";
+
+const categories = {
+  provisions: [
+    "Provision store / mini-mart",
+    5500,3600,35,90,300,950
+  ],
+  supermarket: [
+    "Supermarket",
+    6800,4750,95,220,700,2500
+  ],
+  electronics: [
+    "Electronics & devices",
+    95000,78500,5,22,35,130
+  ],
+  pharmacy: [
+    "Pharmacy / health retail",
+    8200,5900,65,130,300,1700
+  ],
+  fashion: [
+    "Fashion & clothing",
+    18500,10700,15,50,200,380
+  ],
+  ecommerce: [
+    "Online retail (own inventory)",
+    12000,8000,25,80,230,700
+  ],
+  wholesale: [
+    "Wholesale / distribution",
+    34000,28900,12,45,160,310
+  ]
+};
+
+const cases = {
+  base: {
+    name:"Base case",
+    detail:"Business as entered",
+    demand:0,cost:0,price:0,fixed:0,month:1
+  },
+  demand: {
+    name:"Demand falls",
+    detail:"Demand -25% starting month 4",
+    demand:-25,cost:0,price:0,fixed:0,month:4
+  },
+  costs: {
+    name:"Cost shock",
+    detail:"Purchases +25%, overhead +10%",
+    demand:0,cost:25,price:0,fixed:10,month:4
+  },
+  growth: {
+    name:"Growth",
+    detail:"Demand +20%, overhead +10%",
+    demand:20,cost:0,price:0,fixed:10,month:4
+  },
+  custom: {
+    name:"Custom scenario",
+    detail:"Set your own changes"
+  }
+};
+
+const pageNames = {
+  dashboard:"Dashboard",
+  setup:"Business setup",
+  simulation:"Simulation",
+  scenarios:"Scenarios",
+  validation:"Model validation",
+  data:"Economic data",
+  saved:"Saved projects"
+};
+
+const metricFields = {
+  revenue:{name:"Revenue",model:"sales"},
+  cogs:{name:"Cost of goods sold",model:"cogs"},
+  expenses:{name:"Operating expenses",model:"expenses"},
+  profit:{name:"Profit before tax",model:"profit"},
+  cash:{name:"Closing cash",model:"cash"},
+  inventory:{name:"Closing inventory value",model:"inventory"}
+};
+
+function read(key,def) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? def;
+  } catch {
+    return def;
+  }
+}
+
+function store(key,value) {
+  try {
+    localStorage.setItem(key,JSON.stringify(value));
+  } catch {
+    notify("Storage blocked; changes may not persist");
+  }
+}
+
+function uid() {
+  return "sv-" + Date.now() + "-" +
+    Math.random().toString(36).slice(2,8);
+}
+
+function defaults() {
+  return {
+    id:uid(),
+    name:"My retail business",
+    category:"provisions",
+    city:"Lagos",
+    area:"",
+    start:"2023-01",
+    months:12,
+
+    capital:5000000,
+    loan:0,
+    annualInterest:18,
+    loanTerm:24,
+    setupCost:1000000,
+
+    price:5500,
+    unitCost:3600,
+    dailyDemand:35,
+    dailyCapacity:90,
+    openDays:26,
+    openingUnits:300,
+    monthlyPurchases:950,
+    shrinkage:1,
+
+    rent:180000,
+    salaries:240000,
+    electricity:70000,
+    otherCosts:95000,
+
+    annualInflation:20,
+    demandGrowth:0,
+    priceGrowth:0,
+    fxShare:0,
+    fuelShare:0,
+
+    custom:{
+      demand:-15,
+      cost:15,
+      price:0,
+      fixed:0,
+      month:4
+    }
+  };
+}
+
+function esc(s) {
+  return String(s ?? "").replace(
+    /[&<>"']/g,
+    c => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    })[c]
+  );
+}
+
+function n(v,min=0,max=1e12) {
+  return Math.min(max,Math.max(min,Number(v)||0));
+}
+
+function signed(v,min=-100,max=500) {
+  return Math.min(max,Math.max(min,Number(v)||0));
+}
+
+function currency(v) {
+  return (v<0?"−":"") +
+    "₦" +
+    Math.round(Math.abs(v||0)).toLocaleString("en-NG");
+}
+
+function compact(v) {
+  const a=Math.abs(v||0);
+  const pre=v<0?"−₦":"₦";
+
+  return pre + (
+    a>=1e9 ? (a/1e9).toFixed(2)+"bn" :
+    a>=1e6 ? (a/1e6).toFixed(2)+"m" :
+    a>=1e3 ? (a/1e3).toFixed(1)+"k" :
+    Math.round(a)
+  );
+}
+
+function monthAt(start,offset) {
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(start)){
+    start="2023-01";
+  }
+  const [y,m]=start.split("-").map(Number);
+
+  return new Date(
+    Date.UTC(y,m-1+offset,1)
+  ).toISOString().slice(0,7);
+}
+
+function previousMonth(month) {
+  return monthAt(month,-1);
+}
+
+// Load existing SimVest business
+let p={...defaults(),...read(DRAFT,{})};
+
+p.custom={
+  ...defaults().custom,
+  ...p.custom
+};
+
+if(!p.id){
+  p.id=uid();
+  store(DRAFT,p);
+}
+
+// Economic records
+let economic=read(ECON,{
+  records:[],
+  annual:{}
+});
+
+if(!Array.isArray(economic.records)){
+  economic.records=[];
+}
+
+if(!economic.annual ||
+  typeof economic.annual!=="object"){
+  economic.annual={};
+}
+
+// Actual records are stored by business ID
+let allActual=read(ACTUAL,{});
+
+if(!allActual ||
+  typeof allActual!=="object" ||
+  Array.isArray(allActual)){
+  allActual={};
+}
+
+let page="dashboard";
+let scenario="base";
+let metric="cash";
+let validationMetric="revenue";
+
+function notify(message) {
+  const el=$("toast");
+  el.textContent=message;
+  el.classList.add("visible");
+
+  clearTimeout(notify.timer);
+
+  notify.timer=setTimeout(()=>{
+    el.classList.remove("visible");
+  },3000);
+}
+
+// =======================================
+// ECONOMIC DATA ENGINE
+// =======================================
+
+function findEco(key,month) {
+  return economic.records.find(
+    r=>r.metric===key && r.month===month
+  )?.value;
+}
+
+function changes(month,data) {
+  const observed=findEco("cpi_mom",month);
+
+  const annual=
+    findEco("cpi_yoy",month) ??
+    economic.annual[month.slice(0,4)];
+
+  const rate=observed!==undefined
+    ? Number(observed)/100
+    : Math.pow(
+        1+Math.max(
+          -95,
+          Number(annual ?? data.annualInflation)||0
+        )/100,
+        1/12
+      )-1;
+
+  function delta(key) {
+    const current=findEco(key,month);
+    const prior=findEco(key,previousMonth(month));
+
+    return Number(current)>0 && Number(prior)>0
+      ? current/prior-1
+      : null;
+  }
+
+  const fx=delta("fx_ngn_usd");
+  const fuel=delta("petrol_ngn_litre");
+
+  const fxW=n(data.fxShare,0,100)/100;
+  const fuelW=Math.min(
+    1-fxW,n(data.fuelShare,0,100)/100
+  );
+
+  return {
+    procurement:Math.max(
+      .1,
+      1+
+      (1-fxW-fuelW)*rate+
+      fxW*(fx??0)+
+      fuelW*(fuel??0)
+    ),
+
+    fixed:Math.max(.1,1+rate),
+
+    status:
+      observed!==undefined
+        ? "Monthly CPI"
+        : annual!==undefined
+        ? "Annual CPI estimate"
+        : "Manual inflation assumption",
+
+    fxAvailable:fx!==null,
+    fuelAvailable:fuel!==null
+  };
+}
+
+// =======================================
+// RETAIL SIMULATION ENGINE
+// =======================================
+
+function simulate(data=p,scenarioName="base") {
+  const shock=
+    scenarioName==="custom"
+      ? data.custom
+      : cases[scenarioName];
+
+  const rows=[];
+
+  let purchasePrice=n(data.unitCost);
+  let sellingPrice=n(data.price);
+  let demand=n(data.dailyDemand);
+  let stock=n(data.openingUnits);
+  let avgCost=purchasePrice;
+
+  let fixed=
+    n(data.rent)+
+    n(data.salaries)+
+    n(data.electricity)+
+    n(data.otherCosts);
+
+  let cash=
+    n(data.capital)+
+    n(data.loan)-
+    n(data.setupCost)-
+    stock*purchasePrice;
+
+  let debt=n(data.loan);
+  const rate=n(data.annualInterest)/1200;
+  const term=n(data.loanTerm,1,360);
+
+  const loanPayment=debt
+    ? (
+        rate
+          ? debt*rate/
+            (1-Math.pow(1+rate,-term))
+          : debt/term
+      )
+    : 0;
+
+  for(let i=0;i<n(data.months,1,36);i++){
+    const month=monthAt(data.start,i);
+    const eco=changes(month,data);
+
+    if(i){
+      purchasePrice*=eco.procurement;
+      fixed*=eco.fixed;
+
+      sellingPrice*=
+        1+signed(data.priceGrowth,-95,500)/100;
+
+      demand*=
+        1+signed(data.demandGrowth,-95,500)/100;
+    }
+
+    const sh=
+      i+1>=n(shock.month,1,36)
+        ? shock
+        : cases.base;
+
+    const demandUnits=
+      Math.min(
+        demand*Math.max(
+          0,
+          1+signed(sh.demand,-100,500)/100
+        ),
+        n(data.dailyCapacity)
+      )*n(data.openDays,0,31);
+
+    const bought=n(data.monthlyPurchases);
+
+    const paid=
+      bought*
+      purchasePrice*
+      Math.max(
+        0,
+        1+signed(sh.cost,-99,500)/100
+      );
+
+    const available=stock+bought;
+
+    const average=available
+      ? (stock*avgCost+paid)/available
+      : 0;
+
+    const shrink=
+      available*n(data.shrinkage,0,100)/100;
+
+    const units=Math.min(
+      demandUnits,
+      available-shrink
+    );
+
+    stock=Math.max(
+      0,
+      available-shrink-units
+    );
+
+    avgCost=average;
+
+    const sales=
+      units*
+      sellingPrice*
+      Math.max(
+        0,
+        1+signed(sh.price,-100,500)/100
+      );
+
+    const cogs=(units+shrink)*avgCost;
+
+    const expenses=
+      fixed*
+      Math.max(
+        0,
+        1+signed(sh.fixed,-100,500)/100
+      );
+
+    const interest=debt*rate;
+
+    const principal=Math.min(
+      debt,
+      Math.max(0,loanPayment-interest)
+    );
+
+    const repaid=debt
+      ? principal+interest
+      : 0;
+
+    debt=Math.max(0,debt-principal);
+
+    const profit=
+      sales-cogs-expenses-interest;
+
+    cash+=
+      sales-paid-expenses-repaid;
+
+    rows.push({
+      month,
+      sales,
+      cogs,
+      expenses,
+      interest,
+      profit,
+      cash,
+      inventory:stock*avgCost,
+      stock,
+      sold:units,
+      missed:Math.max(0,demandUnits-units),
+      purchaseCash:paid,
+      loanPaid:repaid,
+      debt,
+      source:eco.status
+    });
+  }
+
+  return rows;
+}
+
+function summary(rows) {
+  const total=k=>rows.reduce(
+    (s,r)=>s+r[k],0
+  );
+
+  const last=rows.at(-1);
+
+  return {
+    revenue:total("sales"),
+    profit:total("profit"),
+    cash:last.cash,
+    inventory:last.inventory,
+    missed:total("missed")
+  };
+}
+
+// =======================================
+// UI COMPONENTS
+// =======================================
+
+function heading(title,description,actions="") {
+  return `
+    <div class="heading">
+      <div>
+        <div class="eyebrow">
+          SIMVEST / RETAIL & COMMERCE
+        </div>
+        <h1>${title}</h1>
+        <p>${description}</p>
+      </div>
+      <div class="actions">${actions}</div>
+    </div>
+  `;
+}
+
+function go(text,dest,primary=false) {
+  return `
+    <button
+      class="btn ${primary?"primary":""}"
+      data-go="${dest}">
+      ${text}
+    </button>
+  `;
+}
+
+function card(title,value,sub="") {
+  return `
+    <div class="card kpi">
+      <label>${title}</label>
+      <strong>${value}</strong>
+      <small>${sub}</small>
+    </div>
+  `;
+}
+
+function field(label,key,type="number") {
+  return `
+    <div class="field">
+      <label for="f_${key}">${label}</label>
+      <input
+        id="f_${key}"
+        data-key="${key}"
+        type="${type}"
+        ${type==="number"?'step="any"':""}
+        value="${esc(p[key])}">
+    </div>
+  `;
+}
+
+function select(label,key,items) {
+  return `
+    <div class="field">
+      <label for="f_${key}">${label}</label>
+      <select id="f_${key}" data-key="${key}">
+        ${items.map(([v,t])=>`
+          <option value="${esc(v)}"
+            ${String(v)===String(p[key])?"selected":""}>
+            ${esc(t)}
+          </option>
+        `).join("")}
+      </select>
+    </div>
+  `;
+}
+
+function block(title,items) {
+  return `
+    <section class="card pad">
+      <h2>${title}</h2>
+      <div class="form">
+        ${items.join("")}
+      </div>
+    </section>
+  `;
+}
+
+// SVG graph for projected and real values
+function plot(rows,key,actualByMonth=null) {
+  const vals=rows.map(r=>r[key]);
+
+  if(actualByMonth){
+    rows.forEach(r=>{
+      const actualKey=
+        key==="sales"?"revenue":key;
+
+      const a=actualByMonth[r.month]?.[actualKey];
+
+      if(Number.isFinite(a)){
+        vals.push(a);
+      }
+    });
+  }
+
+  let lo=Math.min(...vals);
+  let hi=Math.max(...vals);
+
+  if(lo===hi){
+    hi+=1;
+    lo-=1;
+  }
+
+  const X=i=>
+    45+i*660/Math.max(1,rows.length-1);
+
+  const Y=v=>
+    224-(v-lo)/(hi-lo)*170;
+
+  const line=rows.map((r,i)=>
+    `${i?"L":"M"}${X(i).toFixed(1)},`+
+    `${Y(r[key]).toFixed(1)}`
+  ).join(" ");
+
+  let actualPath="";
+  let dots="";
+
+  if(actualByMonth){
+    let lastWasValid=false;
+
+    rows.forEach((r,i)=>{
+      const k=key==="sales"?"revenue":key;
+      const v=actualByMonth[r.month]?.[k];
+
+      if(Number.isFinite(v)){
+        actualPath+=
+          (lastWasValid?"L":"M")+
+          X(i).toFixed(1)+","+
+          Y(v).toFixed(1)+" ";
+
+        dots+=`
+          <circle
+            cx="${X(i)}"
+            cy="${Y(v)}"
+            r="3.4"
+            fill="#11a18e">
+            <title>
+              ${esc(r.month)}: ${esc(currency(v))}
+            </title>
+          </circle>
+        `;
+
+        lastWasValid=true;
+      } else {
+        lastWasValid=false;
+      }
+    });
+  }
+
+  return `
+    <div class="chart">
+      <svg
+        viewBox="0 0 760 260"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="${esc(key)} comparison over months">
+
+        <line x1="45" y1="224"
+          x2="712" y2="224" stroke="#dfe5ef"/>
+
+        <line x1="45" y1="54"
+          x2="712" y2="54"
+          stroke="#e6eaf2"
+          stroke-dasharray="5 5"/>
+
+        <text x="5" y="57">
+          ${esc(compact(hi))}
+        </text>
+
+        <text x="5" y="227">
+          ${esc(compact(lo))}
+        </text>
+
+        <path
+          d="${line}"
+          stroke="#536ce5"
+          stroke-width="3"
+          fill="none"
+          stroke-linejoin="round"/>
+
+        ${actualByMonth?`
+          <path
+            d="${actualPath}"
+            fill="none"
+            stroke="#11a18e"
+            stroke-width="3"
+            stroke-linejoin="round"/>
+          ${dots}
+        `:""}
+
+        <text x="45" y="251">
+          ${rows[0].month}
+        </text>
+
+        <text x="631" y="251">
+          ${rows.at(-1).month}
+        </text>
+      </svg>
+    </div>
+
+    <div class="legend">
+      <span>
+        <i class="dot"></i>SimVest simulated
+      </span>
+
+      ${actualByMonth?`
+        <span>
+          <i class="dot actual"></i>
+          Actual business records
+        </span>
+      `:""}
+    </div>
+  `;
+}
+
+// =======================================
+// DASHBOARD
+// =======================================
+
+function dashboard() {
+  const rows=simulate();
+  const s=summary(rows);
+
+  return heading(
+    "Retail business overview",
+    "Explore how financial assumptions affect your retail business.",
+    go("Edit business","setup")+
+    go("Run simulation","simulation",true)
+  )+`
+    <div class="grid kpis">
+      ${card("Projected revenue",compact(s.revenue),
+        `${p.months} months`)}
+
+      ${card("Profit before tax",compact(s.profit),
+        "Simplified accounting model")}
+
+      ${card("Closing cash",compact(s.cash),
+        "After stock purchases and loan payments")}
+
+      ${card("Ending stock",compact(s.inventory),
+        "Stock valued at cost")}
+    </div>
+
+    <div class="grid two">
+      <section class="card pad">
+        <h2>Projected cash balance</h2>
+        ${plot(rows,"cash")}
+      </section>
+
+      <section class="card pad">
+        <h2>Current business</h2>
+
+        <p><b>
+          ${esc(categories[p.category]?.[0]||"Retail")}
+        </b></p>
+
+        <p class="small">
+          📍 ${esc(p.area||p.city)}, Nigeria
+        </p>
+
+        <p class="small">
+          Owner capital: ${currency(p.capital)}
+        </p>
+
+        <p class="small">
+          Daily demand: ${n(p.dailyDemand)} units
+        </p>
+
+        <p class="small">
+          Opening inventory: ${n(p.openingUnits)} units
+        </p>
+
+        <div class="notice warn">
+          Assumptions are illustrative until actual
+          business records and verified economic data
+          are supplied.
+        </div>
+
+        ${go("Compare with real results","validation",true)}
+      </section>
+    </div>
+  `;
+}
+
+// =======================================
+// BUSINESS SETUP
+// =======================================
+
+function setup() {
+  return heading(
+    "Business setup",
+    "Edit the retail company parameters used by the simulation.",
+    go("Run simulation","simulation",true)
+  )+`
+    <div class="grid two">
+      <div class="stack">
+
+        ${block("1. Business and location",[
+          field("Business name","name","text"),
+          select("Retail category","category",
+            Object.entries(categories).map(
+              ([id,c])=>[id,c[0]]
+            )
+          ),
+          field("City","city","text"),
+          field("Neighbourhood","area","text"),
+          field("Starting month","start","month"),
+          select("Simulation duration","months",[
+            [12,"12 months"],
+            [24,"24 months"],
+            [36,"36 months"]
+          ])
+        ])}
+
+        ${block("2. Financial position",[
+          field("Owner capital (₦)","capital"),
+          field("Loan received (₦)","loan"),
+          field("Interest rate (% annually)","annualInterest"),
+          field("Loan term (months)","loanTerm"),
+          field("One-off setup cost, excluding stock (₦)",
+            "setupCost")
+        ])}
+
+        ${block("3. Sales and inventory",[
+          field("Average selling price (₦)","price"),
+          field("Purchase cost per unit (₦)","unitCost"),
+          field("Expected daily demand (units)","dailyDemand"),
+          field("Maximum daily capacity (units)","dailyCapacity"),
+          field("Opening days per month","openDays"),
+          field("Opening inventory (units)","openingUnits"),
+          field("Monthly units purchased","monthlyPurchases"),
+          field("Stock shrinkage per month (%)","shrinkage")
+        ])}
+
+        ${block("4. Monthly fixed expenses",[
+          field("Rent (₦)","rent"),
+          field("Staff salaries (₦)","salaries"),
+          field("Electricity and power (₦)","electricity"),
+          field("Other costs (₦)","otherCosts")
+        ])}
+
+        ${block("5. Economic assumptions",[
+          field("Fallback annual inflation (%)",
+            "annualInflation"),
+          field("Monthly demand growth (%)","demandGrowth"),
+          field("Monthly price growth (%)","priceGrowth"),
+          field("FX-sensitive share of purchases (%)","fxShare"),
+          field("Fuel-sensitive share of purchases (%)","fuelShare")
+        ])}
+      </div>
+
+      <aside class="card pad">
+        <h2>How this model works</h2>
+
+        <p class="small">
+          Units sold are limited by demand, capacity,
+          and stock availability.
+          Buying inventory reduces cash; selling inventory
+          records cost of goods sold.
+        </p>
+
+        <div class="notice">
+          We will compare simulations with real business
+          records in <b>Model validation</b>, without using
+          those results as inputs to the model.
+        </div>
+
+        <div class="notice warn">
+          Profit includes loan interest, but excludes tax
+          and depreciation. All sales and purchases are
+          assumed to be paid immediately.
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+// =======================================
+// SIMULATION PAGE
+// =======================================
+
+function simulationPage() {
+  const rows=simulate();
+  const s=summary(rows);
+
+  return heading(
+    "Simulation results",
+    "Monthly projections from your current business parameters.",
+    '<button class="btn" id="exportSimulation">'+
+    'Export simulation CSV</button>'
+  )+`
+    <div class="grid kpis">
+      ${card("Revenue",compact(s.revenue))}
+      ${card("Profit before tax",compact(s.profit))}
+      ${card("Closing cash",compact(s.cash))}
+      ${card("Missed units",
+        Math.round(s.missed).toLocaleString())}
+    </div>
+
+    <section class="card pad">
+      <div class="inline">
+        <h2>Financial performance</h2>
+
+        <div class="pills">
+          ${[
+            ["cash","Cash"],
+            ["sales","Revenue"],
+            ["profit","Profit"]
+          ].map(([k,t])=>`
+            <button
+              class="pill ${metric===k?"active":""}"
+              data-metric="${k}">
+              ${t}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+
+      ${plot(rows,metric)}
+    </section>
+
+    <section class="card pad section">
+      <h2>Monthly financial report</h2>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              ${[
+                "Month","Revenue","COGS","Expenses",
+                "Interest","Profit","Cash","Inventory",
+                "Lost sales (units)"
+              ].map(v=>`<th>${v}</th>`).join("")}
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.map(r=>`
+              <tr>
+                <td>${r.month}</td>
+                ${[
+                  "sales","cogs","expenses","interest",
+                  "profit","cash","inventory"
+                ].map(k=>`
+                  <td>${currency(r[k])}</td>
+                `).join("")}
+                <td>${Math.round(r.missed)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="small">
+        Cash, inventory, and profit are distinct measures.
+        VAT, income tax, depreciation and credit sales
+        are not included.
+      </p>
+    </section>
+  `;
+}
+
+// =======================================
+// SCENARIOS
+// =======================================
+
+function scenariosPage() {
+  const base=summary(simulate());
+  const alt=summary(simulate(p,scenario));
+  const rows=simulate(p,scenario);
+
+  return heading(
+    "What-if scenarios",
+    "Explore alternative outcomes without changing the original business model."
+  )+`
+    <div class="grid scenario-grid">
+      ${Object.entries(cases).map(([key,v])=>`
+        <button
+          class="scenario ${scenario===key?"selected":""}"
+          data-scenario="${key}">
+
+          <strong>${v.name}</strong>
+          <p>${v.detail}</p>
+        </button>
+      `).join("")}
+    </div>
+
+    ${scenario==="custom"?`
+      <section class="card pad section">
+        <h2>Custom shock</h2>
+
+        <div class="form">
+          ${[
+            ["demand","Demand change (%)"],
+            ["cost","Purchase-cost change (%)"],
+            ["price","Sale-price change (%)"],
+            ["fixed","Overhead change (%)"],
+            ["month","Beginning month"]
+          ].map(([k,label])=>`
+            <div class="field">
+              <label>${label}</label>
+              <input type="number" step="any"
+                data-custom="${k}"
+                value="${esc(p.custom[k])}">
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `:""}
+
+    <div class="grid kpis section">
+      ${card("Base profit",compact(base.profit))}
+      ${card("Scenario profit",compact(alt.profit))}
+      ${card("Base cash",compact(base.cash))}
+      ${card("Scenario cash",compact(alt.cash))}
+    </div>
+
+    <section class="card pad">
+      <h2>Scenario cash trend</h2>
+
+      ${plot(rows,"cash")}
+
+      <p class="small">
+        Cash change from base:
+        <b>${currency(alt.cash-base.cash)}</b>.
+        Scenario changes are assumptions,
+        not verified historical events.
+      </p>
+    </section>
+  `;
+}
+
+// =======================================
+// MODEL VALIDATION ENGINE
+// =======================================
+
+// Real business records stay separate from
+// simulation inputs.
+
+function actualRows() {
+  return Array.isArray(allActual[p.id])
+    ? allActual[p.id]
+    : [];
+}
+
+function actualMap() {
+  return Object.fromEntries(
+    actualRows().map(r=>[r.month,r])
+  );
+}
+
+function compare(rows,fieldKey) {
+  const simKey=metricFields[fieldKey].model;
+  const by=actualMap();
+  const joined=[];
+
+  rows.forEach(r=>{
+    const a=by[r.month]?.[fieldKey];
+
+    if(Number.isFinite(a)){
+      joined.push({
+        month:r.month,
+        simulated:r[simKey],
+        actual:a,
+        error:r[simKey]-a
+      });
+    }
+  });
+
+  return joined;
+}
+
+function metrics(rows) {
+  if(!rows.length){
+    return null;
+  }
+
+  const total=rows.reduce(
+    (a,r)=>({
+      abs:a.abs+Math.abs(r.error),
+      actualAbs:a.actualAbs+Math.abs(r.actual),
+      bias:a.bias+r.error
+    }),
+    {abs:0,actualAbs:0,bias:0}
+  );
+
+  return {
+    mae:total.abs/rows.length,
+
+    wape:total.actualAbs>0
+      ? 100*total.abs/total.actualAbs
+      : null,
+
+    bias:total.bias/rows.length
+  };
+}
+
+// =======================================
+// MODEL VALIDATION DASHBOARD
+// =======================================
+
+function validationPage() {
+  const rows=simulate();
+  const actual=actualRows();
+
+  const joined=compare(rows,validationMetric);
+  const m=metrics(joined);
+
+  const fieldName=metricFields[validationMetric].name;
+  const actualByMonth=actualMap();
+
+  return heading(
+    "Model validation",
+    "Compare this retail simulation against genuine monthly results from the same business.",
+    go("Edit business assumptions","setup")
+  )+`
+    <div class="grid kpis">
+      ${card(
+        "Actual months imported",
+        actual.length,
+        "Stored only in this browser"
+      )}
+
+      ${card(
+        "Months matched",
+        joined.length,
+        "Out of "+rows.length+" simulated months"
+      )}
+
+      ${card(
+        "Mean absolute error",
+        m?compact(m.mae):"—",
+        m?"Average monthly absolute difference":
+          "Requires real records"
+      )}
+
+      ${card(
+        "WAPE",
+        m&&m.wape!==null
+          ?m.wape.toFixed(1)+"%"
+          :"—",
+        "Weighted absolute percentage error"
+      )}
+    </div>
+
+    <div class="grid two">
+      <section class="card pad">
+        <div class="inline">
+          <h2>
+            Actual vs simulated: ${fieldName}
+          </h2>
+
+          <span class="badge">
+            ${esc(p.start)} · ${p.months} months
+          </span>
+        </div>
+
+        <div class="pills" style="margin-bottom:16px">
+          ${Object.entries(metricFields).map(([k,v])=>`
+            <button
+              class="pill ${k===validationMetric?"active":""}"
+              data-compare="${k}">
+              ${v.name}
+            </button>
+          `).join("")}
+        </div>
+
+        ${joined.length
+          ? plot(
+              rows,
+              metricFields[validationMetric].model,
+              actualByMonth
+            )
+          : `
+            <div class="empty">
+              No actual
+              ${esc(fieldName.toLowerCase())}
+              observations match this simulation period yet.
+              <p>
+                Import genuine monthly records below
+                to activate the comparison graph.
+              </p>
+            </div>
+          `
+        }
+
+        ${m?`
+          <p class="small">
+            Average signed error (simulation - actual):
+            <b>${currency(m.bias)}</b>.
+            Negative means the model underestimates
+            on average.
+          </p>
+        `:""}
+      </section>
+
+      <aside class="card pad">
+        <h2>Import actual retail results</h2>
+
+        <p class="small">
+          CSV column names:
+          <code>month,revenue,cogs,expenses,profit,cash,inventory</code>.
+          Only <code>month</code> and at least one
+          financial metric are required.
+          Leave unknown values empty.
+        </p>
+
+        <div class="field">
+          <label for="actualFile">
+            Choose a CSV file
+          </label>
+
+          <input id="actualFile"
+            type="file"
+            accept=".csv,text/csv">
+        </div>
+
+        <p class="small">Or paste CSV text:</p>
+
+        <div class="field">
+          <textarea
+            id="actualText"
+            spellcheck="false"
+            placeholder="month,revenue,cogs,expenses,profit,cash,inventory&#10;2023-01,,,,,,&#10;2023-02,,,,,,"></textarea>
+        </div>
+
+        <div class="actions" style="margin-top:12px">
+          <button class="btn primary" id="importActual">
+            Import actual results
+          </button>
+
+          <button class="btn" id="downloadTemplate">
+            CSV template
+          </button>
+
+          <button class="btn red" id="clearActual">
+            Clear actual results
+          </button>
+        </div>
+
+        <div class="notice warn">
+          Imported data is not automatically verified.
+          Only use records belonging to this specific business.
+
+          Actual results are used <b>only for comparison</b>,
+          never as inputs to the simulation.
+        </div>
+      </aside>
+    </div>
+
+    <section class="card pad section">
+      <h2>
+        Month-by-month comparison — ${fieldName}
+      </h2>
+
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Simulated</th>
+              <th>Actual</th>
+              <th>Difference</th>
+              <th>Absolute % error</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.map(r=>{
+              const actualValue=
+                actualByMonth[r.month]?.[validationMetric];
+
+              const simulated=
+                r[metricFields[validationMetric].model];
+
+              const valid=Number.isFinite(actualValue);
+
+              const error=valid
+                ?simulated-actualValue
+                :0;
+
+              const ape=
+                valid&&Math.abs(actualValue)>0
+                  ?Math.abs(error/actualValue)*100
+                  :null;
+
+              return `
+                <tr>
+                  <td>${r.month}</td>
+
+                  <td>
+                    ${currency(simulated)}
+                  </td>
+
+                  <td>
+                    ${valid?currency(actualValue):"—"}
+                  </td>
+
+                  <td>
+                    ${valid?currency(error):"—"}
+                  </td>
+
+                  <td>
+                    ${ape===null?"—":ape.toFixed(1)+"%"}
+                  </td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="small">
+        For valid comparisons, use the same accounting
+        definitions: gross sales, inventory COGS including
+        stock loss, operating costs excluding interest,
+        profit before tax and depreciation after interest,
+        closing cash, and inventory at cost.
+
+        Gaps in actual data are not filled with fake numbers.
+      </p>
+    </section>
+
+    <section class="notice section">
+      This is <b>historical reconstruction</b>.
+      A close fit does not prove forecasting accuracy.
+      Future predictive tests must withhold later business
+      results and assumptions when constructing the model.
+    </section>
+  `;
+}
+
+// =======================================
+// ECONOMIC DATA PAGE
+// =======================================
+
+function dataPage() {
+  const years=Object.keys(economic.annual);
+
+  return heading(
+    "Economic data",
+    "Use a historical economic series for the same simulation period."
+  )+`
+    <div class="grid two">
+      <div class="stack">
+        <section class="card pad">
+          <h2>World Bank annual CPI — Nigeria</h2>
+
+          <p class="small">
+            Retrieve annual inflation rates.
+            When monthly CPI is missing, the model
+            converts an annual rate into a constant
+            monthly-equivalent assumption.
+
+            It is <b>not</b> an observed monthly rate.
+          </p>
+
+          <button class="btn primary" id="fetchBank">
+            Fetch annual CPI
+          </button>
+
+          <p class="small">
+            ${years.length} annual observations cached
+          </p>
+        </section>
+
+        <section class="card pad">
+          <h2>
+            Import verified monthly economic observations
+          </h2>
+
+          <p class="small">
+            Format:
+            <code>metric,month,value,source</code>.
+
+            Supported metrics:
+            <code>cpi_mom</code>,
+            <code>cpi_yoy</code>,
+            <code>fx_ngn_usd</code>,
+            <code>petrol_ngn_litre</code>.
+          </p>
+
+          <div class="field">
+            <textarea
+              id="econText"
+              placeholder="metric,month,value,source&#10;cpi_mom,2023-01,REPLACE_WITH_VERIFIED_VALUE,NBS"></textarea>
+          </div>
+
+          <div class="actions" style="margin-top:12px">
+            <button class="btn primary"
+              id="importEconomic">
+              Import economic data
+            </button>
+
+            <button class="btn red"
+              id="clearEconomic">
+              Clear monthly data
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <aside class="card pad">
+        <h2>Data coverage</h2>
+
+        <p class="small">
+          Imported monthly rows:
+          <b>${economic.records.length}</b>
+        </p>
+
+        <p class="small">
+          World Bank annual records:
+          <b>${years.length}</b>
+        </p>
+
+        <p class="small">
+          Historical FX and fuel changes require
+          two consecutive observations.
+          Missing observations do not become
+          fictional measurements.
+        </p>
+
+        <div class="notice warn">
+          Local uploads are not verified or kept up
+          to date automatically.
+
+          Browser storage is not a secure database
+          for confidential records.
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+// =======================================
+// SAVED PROJECTS
+// =======================================
+
+function savedPage() {
+  const projects=read(SAVED,[]);
+
+  return heading(
+    "Saved projects",
+    "Open a retail business or create another local project.",
+    '<button class="btn primary" id="newProject">'+
+    '+ New retail business</button>'
+  )+`
+    <section class="card pad">
+      <h2>Saved businesses (${projects.length})</h2>
+
+      <div class="stack">
+        ${projects.length
+          ? projects.map((x,i)=>`
+              <div class="savedrow">
+                <div>
+                  <b>${esc(x.name)}</b>
+
+                  <div class="small">
+                    ${esc(categories[x.category]?.[0]||"Retail")}
+                    · ${esc(x.city)}
+                    · ${x.months} months
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn sm"
+                    data-open="${i}">
+                    Open
+                  </button>
+
+                  <button class="btn sm red"
+                    data-delete="${i}">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            `).join("")
+          : `
+            <div class="empty">
+              No saved businesses yet.
+              Use Save project at the top
+              to keep the current one.
+            </div>
+          `
+        }
+      </div>
+    </section>
+  `;
+}
+
+// =======================================
+// PAGE RENDERING
+// =======================================
+
+function render() {
+  const views={
+    dashboard,
+    setup,
+    simulation:simulationPage,
+    scenarios:scenariosPage,
+    validation:validationPage,
+    data:dataPage,
+    saved:savedPage
+  };
+
+  $("pageTitle").textContent=pageNames[page];
+
+  document.querySelectorAll("[data-page]").forEach(
+    b=>b.classList.toggle(
+      "active",
+      b.dataset.page===page
+    )
+  );
+
+  $("content").innerHTML=views[page]();
+}
+
+function saveProject() {
+  const arr=read(SAVED,[]);
+  const idx=arr.findIndex(x=>x.id===p.id);
+
+  if(idx<0){
+    arr.unshift(structuredClone(p));
+  } else {
+    arr[idx]=structuredClone(p);
+  }
+
+  store(SAVED,arr);
+  store(DRAFT,p);
+
+  notify("Business saved to this browser");
+}
+
+// =======================================
+// CSV EXPORTS
+// =======================================
+
+function download(text,filename) {
+  const url=URL.createObjectURL(
+    new Blob([text],{
+      type:"text/csv;charset=utf-8"
+    })
+  );
+
+  const a=document.createElement("a");
+
+  a.href=url;
+  a.download=filename;
+  a.click();
+
+  setTimeout(()=>{
+    URL.revokeObjectURL(url);
+  },2000);
+}
+
+function exportSimulation() {
+  const cols=[
+    "month",
+    "sales",
+    "cogs",
+    "expenses",
+    "interest",
+    "profit",
+    "cash",
+    "inventory",
+    "stock",
+    "sold",
+    "missed",
+    "purchaseCash",
+    "loanPaid",
+    "debt",
+    "source"
+  ];
+
+  const csv=[
+    cols.join(","),
+    ...simulate().map(r=>
+      cols.map(k=>r[k]).join(",")
+    )
+  ].join("\n");
+
+  download(csv,"simvest-simulation.csv");
+}
+
+function template() {
+  const header=
+    "month,revenue,cogs,expenses,profit,cash,inventory";
+
+  const csv=[
+    header,
+    ...simulate().map(r=>r.month+",,,,,,")
+  ].join("\n");
+
+  download(
+    csv,
+    "simvest-actual-results-template.csv"
+  );
+}
+
+// =======================================
+// CSV FILE PARSER
+// =======================================
+
+function parseCSV(input) {
+  const rows=[];
+  let row=[];
+  let cell="";
+  let quote=false;
+
+  input=input.replace(/^\uFEFF/,"");
+
+  for(let i=0;i<input.length;i++){
+    const ch=input[i];
+
+    if(quote){
+      if(ch==='"'&&input[i+1]==='"'){
+        cell+='"';
+        i++;
+      } else if(ch==='"'){
+        quote=false;
+      } else {
+        cell+=ch;
+      }
+    } else if(ch==='"'){
+      quote=true;
+    } else if(ch===","){
+      row.push(cell);
+      cell="";
+    } else if(ch==="\n"||ch==="\r"){
+      if(ch==="\r"&&input[i+1]==="\n"){
+        i++;
+      }
+
+      row.push(cell);
+
+      if(row.some(x=>x.trim())){
+        rows.push(row);
+      }
+
+      row=[];
+      cell="";
+    } else {
+      cell+=ch;
+    }
+  }
+
+  if(quote){
+    throw Error("Unclosed quotation mark in CSV");
+  }
+
+  row.push(cell);
+
+  if(row.some(x=>x.trim())){
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function parseAmount(x) {
+  let t=String(x??"").trim();
+
+  if(t===""){
+    return null;
+  }
+
+  const negative=/^\(.+\)$/.test(t);
+
+  t=t.replace(/[₦,\s()]/g,"");
+
+  const v=Number(t);
+
+  if(!Number.isFinite(v)||t===""){
+    throw Error(
+      "Invalid numeric amount: "+
+      String(x).slice(0,40)
+    );
+  }
+
+  return negative?-v:v;
+}
+
+// =======================================
+// ACTUAL COMPANY RECORD IMPORT
+// =======================================
+
+function importActual(text) {
+  const csv=parseCSV(text);
+
+  if(csv.length<2){
+    throw Error(
+      "CSV needs a header and at least one data row"
+    );
+  }
+
+  const headers=csv.shift().map(
+    h=>h.trim().toLowerCase()
+  );
+
+  if(!headers.includes("month")){
+    throw Error("Missing month column");
+  }
+
+  const keys=Object.keys(metricFields).filter(
+    k=>headers.includes(k)
+  );
+
+  if(!keys.length){
+    throw Error(
+      "Add at least one metric: "+
+      Object.keys(metricFields).join(", ")
+    );
+  }
+
+  const map=new Map(
+    actualRows().map(r=>[r.month,r])
+  );
+
+  let count=0;
+
+  for(const [i,line] of csv.entries()){
+    const obj=Object.fromEntries(
+      headers.map((h,j)=>[h,line[j]??""])
+    );
+
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(obj.month)){
+      throw Error(
+        "Invalid month on line "+(i+2)
+      );
+    }
+
+    const values={};
+
+    for(const k of keys){
+      const val=parseAmount(obj[k]);
+
+      if(val!==null){
+        values[k]=val;
+      }
+    }
+
+    if(!Object.keys(values).length){
+      continue;
+    }
+
+    map.set(obj.month,{
+      ...(map.get(obj.month)||{
+        month:obj.month
+      }),
+      ...values
+    });
+
+    count++;
+  }
+
+  if(!count){
+    throw Error("No numeric records imported");
+  }
+
+  allActual[p.id]=[...map.values()].sort(
+    (a,b)=>a.month.localeCompare(b.month)
+  );
+
+  store(ACTUAL,allActual);
+
+  return count;
+}
+
+// =======================================
+// ECONOMIC DATA IMPORT
+// =======================================
+
+function importEconomic(text) {
+  const csv=parseCSV(text);
+
+  if(csv.length<2){
+    throw Error(
+      "CSV needs a header and data rows"
+    );
+  }
+
+  const head=csv.shift().map(
+    h=>h.trim().toLowerCase()
+  );
+
+  for(const x of [
+    "metric","month","value","source"
+  ]){
+    if(!head.includes(x)){
+      throw Error("Missing column "+x);
+    }
+  }
+
+  const allowed=new Set([
+    "cpi_mom",
+    "cpi_yoy",
+    "fx_ngn_usd",
+    "petrol_ngn_litre"
+  ]);
+
+  const map=new Map(
+    economic.records.map(
+      r=>[r.metric+"|"+r.month,r]
+    )
+  );
+
+  let count=0;
+
+  for(const [i,row] of csv.entries()){
+    const x=Object.fromEntries(
+      head.map((h,j)=>[h,row[j]??""])
+    );
+
+    if(
+      !allowed.has(x.metric) ||
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(x.month) ||
+      !x.source.trim()
+    ){
+      throw Error(
+        "Invalid data at line "+(i+2)
+      );
+    }
+
+    const value=parseAmount(x.value);
+
+    if(
+      value===null ||
+      (
+        (
+          x.metric==="fx_ngn_usd" ||
+          x.metric==="petrol_ngn_litre"
+        ) &&
+        value<=0
+      )
+    ){
+      throw Error(
+        "Invalid value on line "+(i+2)
+      );
+    }
+
+    map.set(
+      x.metric+"|"+x.month,
+      {
+        metric:x.metric,
+        month:x.month,
+        value,
+        source:x.source
+      }
+    );
+
+    count++;
+  }
+
+  economic.records=[...map.values()].sort(
+    (a,b)=>a.month.localeCompare(b.month)
+  );
+
+  store(ECON,economic);
+
+  return count;
+}
+
+// =======================================
+// WORLD BANK DATA
+// =======================================
+
+async function fetchBank() {
+  const r=await fetch(
+    "https://api.worldbank.org/v2/country/NG/indicator/FP.CPI.TOTL.ZG?format=json&per_page=150"
+  );
+
+  if(!r.ok){
+    throw Error(
+      "World Bank HTTP "+r.status
+    );
+  }
+
+  const json=await r.json();
+
+  if(!Array.isArray(json[1])){
+    throw Error("Unexpected API response");
+  }
+
+  const series={};
+
+  json[1].forEach(x=>{
+    if(
+      x.value!==null &&
+      Number.isFinite(Number(x.value))
+    ){
+      series[x.date]=Number(x.value);
+    }
+  });
+
+  economic.annual=series;
+  store(ECON,economic);
+
+  return Object.keys(series).length;
+}
+
+// =======================================
+// USER INTERACTIONS
+// =======================================
+
+$("navigation").addEventListener("click",ev=>{
+  const btn=ev.target.closest("[data-page]");
+
+  if(!btn)return;
+
+  page=btn.dataset.page;
+  $("sidebar").classList.remove("open");
+  render();
+});
+
+$("menuButton").onclick=()=>{
+  $("sidebar").classList.toggle("open");
+};
+
+$("saveButton").onclick=saveProject;
+
+$("content").addEventListener("change",async ev=>{
+  const el=ev.target;
+
+  if(el.dataset.key){
+    const key=el.dataset.key;
+
+    const v=el.type==="number"
+      ?Number(el.value)
+      :el.value;
+
+    if(key==="category"){
+      const c=categories[v];
+
+      if(!c)return;
+
+      Object.assign(p,{
+        category:v,
+        price:c[1],
+        unitCost:c[2],
+        dailyDemand:c[3],
+        dailyCapacity:c[4],
+        openingUnits:c[5],
+        monthlyPurchases:c[6]
+      });
+
+      render();
+    } else {
+      p[key]=v;
+    }
+
+    store(DRAFT,p);
+  }
+
+  if(el.dataset.custom){
+    p.custom[el.dataset.custom]=Number(el.value);
+    store(DRAFT,p);
+    render();
+  }
+
+  if(el.id==="actualFile"&&el.files?.length){
+    const file=el.files[0];
+
+    if(file.size>1024*1024){
+      notify("Maximum file size: 1 MB");
+      return;
+    }
+
+    try {
+      const count=importActual(
+        await file.text()
+      );
+
+      notify(
+        `Imported ${count} actual months`
+      );
+
+      render();
+    } catch(err){
+      notify(err.message);
+    }
+  }
+});
+
+$("content").addEventListener("click",async ev=>{
+  const b=ev.target.closest("button");
+
+  if(!b)return;
+
+  if(b.dataset.go){
+    page=b.dataset.go;
+    render();
+
+  } else if(b.dataset.metric){
+    metric=b.dataset.metric;
+    render();
+
+  } else if(b.dataset.compare){
+    validationMetric=b.dataset.compare;
+    render();
+
+  } else if(b.dataset.scenario){
+    scenario=b.dataset.scenario;
+    render();
+
+  } else if(b.id==="exportSimulation"){
+    exportSimulation();
+
+  } else if(b.id==="downloadTemplate"){
+    template();
+
+  } else if(b.id==="importActual"){
+    try {
+      const count=importActual(
+        $("actualText").value
+      );
+
+      notify(
+        `Imported ${count} actual months`
+      );
+
+      render();
+    } catch(e){
+      notify(e.message);
+    }
+
+  } else if(b.id==="clearActual"){
+    if(confirm(
+      "Delete the actual records for this business?"
+    )){
+      delete allActual[p.id];
+      store(ACTUAL,allActual);
+      render();
+    }
+
+  } else if(b.id==="importEconomic"){
+    try {
+      const count=importEconomic(
+        $("econText").value
+      );
+
+      notify(
+        `Imported ${count} economic observations`
+      );
+
+      render();
+    } catch(e){
+      notify(e.message);
+    }
+
+  } else if(b.id==="clearEconomic"){
+    if(confirm(
+      "Delete imported monthly economic observations?"
+    )){
+      economic.records=[];
+      store(ECON,economic);
+      render();
+    }
+
+  } else if(b.id==="fetchBank"){
+    b.disabled=true;
+    b.textContent="Fetching…";
+
+    try {
+      const count=await fetchBank();
+
+      notify(
+        `Loaded ${count} annual CPI records`
+      );
+
+      render();
+    } catch(e){
+      b.disabled=false;
+      b.textContent="Fetch annual CPI";
+
+      notify(
+        "Could not fetch data: "+e.message
+      );
+    }
+
+  } else if(b.id==="newProject"){
+    p=defaults();
+    store(DRAFT,p);
+    page="setup";
+    render();
+
+  } else if(b.dataset.open!==undefined){
+    const item=read(SAVED,[])[
+      Number(b.dataset.open)
+    ];
+
+    if(item){
+      p={
+        ...defaults(),
+        ...item,
+        custom:{
+          ...defaults().custom,
+          ...item.custom
+        }
+      };
+
+      store(DRAFT,p);
+      page="dashboard";
+      render();
+    }
+
+  } else if(b.dataset.delete!==undefined){
+    if(confirm("Delete saved business?")){
+      const projects=read(SAVED,[]);
+
+      projects.splice(
+        Number(b.dataset.delete),1
+      );
+
+      store(SAVED,projects);
+      render();
+    }
+  }
+});
+
+// =======================================
+// INITIALISE SIMVEST
+// =======================================
+
+render();
+
+})();
+</script>
 </body>
 </html>

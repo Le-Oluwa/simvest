@@ -1,180 +1,1649 @@
-'use strict';
-/* SimVest Studio v0.2 — transparent, deterministic, client-only demonstration engine.
-   No live financial, location, inflation, or tax data. Values are user assumptions. */
+
+/* SimVest Retail & Commerce v0.5
+   Illustrative financial simulation engine.
+*/
+
 (() => {
-const STORE='simvest_projects_v2', DRAFT='simvest_draft_v2';
-const TYPE_INFO={
- food:{name:'Food business / restaurant',short:'Restaurant',icon:'🍽️',desc:'Meals, customers, ingredients and seating/production capacity.',fields:{sales:'Meals sold per day',capacity:'Maximum meals per day',price:'Average selling price per meal (₦)',cost:'Ingredient + packaging cost per meal (₦)'},defaults:{sales:45,capacity:80,price:2700,cost:1200,days:26,payroll:450000,rent:220000,utilities:120000,other:130000,setupCost:2500000}},
- retail:{name:'Retail / trading',short:'Retail store',icon:'🛍️',desc:'Orders, inventory unit costs, selling prices and throughput.',fields:{sales:'Units sold per day',capacity:'Maximum units fulfilled per day',price:'Average selling price per unit (₦)',cost:'Purchase + handling cost per unit (₦)'},defaults:{sales:35,capacity:90,price:5500,cost:3600,days:26,payroll:240000,rent:180000,utilities:70000,other:95000,setupCost:3000000}},
- logistics:{name:'Logistics / delivery',short:'Delivery service',icon:'🚚',desc:'Deliveries, charges, cost per trip and daily fleet capacity.',fields:{sales:'Deliveries per day',capacity:'Maximum deliveries per day',price:'Average delivery fee (₦)',cost:'Fuel + trip variable cost per delivery (₦)'},defaults:{sales:35,capacity:65,price:3000,cost:1100,days:26,payroll:450000,rent:100000,utilities:45000,other:180000,setupCost:3200000}}
-};
-const SCENARIOS={
- base:{name:'Base case',blurb:'Your assumptions, unchanged.',volume:0,cost:0,price:0,fixed:0,month:1},
- demand:{name:'Demand drops',blurb:'Customer or order volume falls 25% from month 4.',volume:-25,cost:0,price:0,fixed:0,month:4},
- costs:{name:'Costs surge',blurb:'Variable costs rise 25% and fixed costs rise 10%.',volume:0,cost:25,price:0,fixed:10,month:4},
- growth:{name:'Growth opportunity',blurb:'Volume increases 20%, with a 10% overhead increase.',volume:20,cost:0,price:0,fixed:10,month:4},
- custom:{name:'Custom scenario',blurb:'Set your own assumptions and starting month.'}
-};
-const NAMES={overview:'Overview',setup:'Business setup',simulation:'Simulation',scenarios:'Scenarios',reports:'Reports & exports',saved:'Saved projects'};
-const DEFAULT_CUSTOM={volume:-15,cost:15,price:0,fixed:0,month:4};
-const el=id=>document.getElementById(id);
-const clone=o=>JSON.parse(JSON.stringify(o));
-const escapeHTML=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmtN=n=>Math.round(Number(n)||0).toLocaleString('en-NG');
-const currency=n=>(n<0?'−₦':'₦')+fmtN(Math.abs(n));
-const compact=n=>{if(!Number.isFinite(n))return '—'; const a=Math.abs(n), prefix=n<0?'−₦':'₦';return prefix+(a>=1e9?(a/1e9).toFixed(2)+'bn':a>=1e6?(a/1e6).toFixed(2)+'m':a>=1000?(a/1000).toFixed(1)+'k':fmtN(a));};
-const pct=n=>`${(Number(n)||0).toFixed(1)}%`;
-const numeric=(v,min=-Infinity,max=Infinity)=>Math.min(max,Math.max(min,Number.isFinite(+v)?+v:0));
-function newProject(type='food') {
- const t=TYPE_INFO[type]||TYPE_INFO.food,d=t.defaults;
- return {id:'draft',name:'My '+t.short+' simulation',type,city:'Lagos',area:'',country:'Nigeria',period:12,
- finance:{funds:5000000,setupCost:d.setupCost,debt:1200000,principal:80000,interest:18},
- ops:{sales:d.sales,capacity:d.capacity,price:d.price,cost:d.cost,days:d.days,payroll:d.payroll,rent:d.rent,utilities:d.utilities,other:d.other},
- economy:{annualInflation:20,monthlyDemandGrowth:1.5,monthlyPriceGrowth:.6,localCostFactor:1},
- custom:clone(DEFAULT_CUSTOM),updated:new Date().toISOString()};
-}
-let state={view:'overview',tab:'identity',metric:'cash',project:newProject(),scenario:'base'};
-try{const saved=JSON.parse(localStorage.getItem(DRAFT)||'null');if(saved?.ops&&saved?.finance&&TYPE_INFO[saved.type])state.project={...newProject(saved.type),...saved};}catch(_){}
-function saveDraft(){try{state.project.updated=new Date().toISOString();localStorage.setItem(DRAFT,JSON.stringify(state.project));}catch(_){}}
-function projects(){try{const p=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(p)?p:[];}catch(_){return [];}}
-function putProjects(arr){try{localStorage.setItem(STORE,JSON.stringify(arr));return true;}catch(_){notify('Unable to save. Browser storage may be disabled.');return false;}}
-function projection(p,shock=SCENARIOS.base){
- const result=[],f=p.finance,o=p.ops,e=p.economy;
- const annualInflation=numeric(e.annualInflation,-50,500),mInflation=Math.pow(1+annualInflation/100,1/12)-1;
- const demandGrowth=numeric(e.monthlyDemandGrowth,-50,200)/100,priceGrowth=numeric(e.monthlyPriceGrowth,-50,200)/100;
- let cash=numeric(f.funds,0)-numeric(f.setupCost,0),debt=numeric(f.debt,0);
- for(let m=1;m<=numeric(p.period,12,36);m++){
-  const active=m>=numeric(shock.month||1,1,36),volumeShock=active?numeric(shock.volume,-95,300)/100:0,costShock=active?numeric(shock.cost,-95,300)/100:0;
-  const priceShock=active?numeric(shock.price,-95,300)/100:0,fixedShock=active?numeric(shock.fixed,-95,300)/100:0;
-  const demand=Math.max(0,numeric(o.sales,0)*(1+demandGrowth)**(m-1)*(1+volumeShock));
-  const units=Math.min(demand,numeric(o.capacity,0))*numeric(o.days,0,31);
-  const unitPrice=numeric(o.price,0)*(1+priceGrowth)**(m-1)*(1+priceShock);
-  const unitCost=numeric(o.cost,0)*(1+mInflation)**(m-1)*(1+costShock);
-  const fixedBase=(numeric(o.payroll,0)+numeric(o.rent,0)+numeric(o.utilities,0)+numeric(o.other,0));
-  const fixed=fixedBase*numeric(e.localCostFactor,.1,3)*(1+mInflation)**(m-1)*(1+fixedShock);
-  const revenue=units*unitPrice,cogs=units*unitCost,gross=revenue-cogs,interest=debt*numeric(f.interest,0,100)/100/12;
-  const operatingProfit=gross-fixed,netProfit=operatingProfit-interest;
-  const principal=Math.min(debt,numeric(f.principal,0)),cashflow=netProfit-principal;
-  const openingCash=cash;cash+=cashflow;debt-=principal;
-  const contribution=unitPrice-unitCost,bePerDay=contribution>0?Math.ceil((fixed+interest)/(contribution*Math.max(numeric(o.days,0,31),1))):Infinity;
-  result.push({month:m,openingCash,units,demandPerDay:demand,unitPrice,unitCost,revenue,cogs,gross,fixed,interest,operatingProfit,profit:netProfit,principal,cashflow,cash,debt,bePerDay,margin:revenue>0?100*netProfit/revenue:0});
- }
- return result;
-}
-function stats(rows,p){const last=rows[rows.length-1],first=rows[0],sum=k=>rows.reduce((a,r)=>a+r[k],0),fail=rows.find(r=>r.cash<0),totalRevenue=sum('revenue'),totalProfit=sum('profit');return {first,last,sum,fail,openingCash:p.finance.funds-p.finance.setupCost,totalRevenue,totalProfit,margin:totalRevenue?100*totalProfit/totalRevenue:0};}
-function selectedShock(){return state.scenario==='custom'?state.project.custom:SCENARIOS[state.scenario]||SCENARIOS.base;}
-function getModels(){const p=state.project;const base=projection(p,SCENARIOS.base),selected=projection(p,selectedShock());return {p,base,selected,bs:stats(base,p),ss:stats(selected,p)};}
-function notify(msg){let x=el('toast');x.textContent=msg;x.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>x.classList.remove('show'),3200);}
-function badge(text,colour=''){return `<span class="pill ${colour}">${escapeHTML(text)}</span>`;}
-function titleBlock(title,sub,actions=''){return `<div class="hero-top"><div><div class="eyebrow">SIMVEST STUDIO / ${escapeHTML(NAMES[state.view].toUpperCase())}</div><h1 class="h1">${title}</h1><p class="sub">${sub}</p></div>${actions?`<div class="hero-actions">${actions}</div>`:''}</div>`;}
-function actionBtn(text,view,cls='btn-primary'){return `<button class="btn ${cls}" data-view="${view}">${text}</button>`;}
-function context(p){return `<div class="context-strip">${badge(TYPE_INFO[p.type].icon+' '+TYPE_INFO[p.type].short)}${badge('📍 '+escapeHTML(p.city||'Location not set'))}${badge(p.period+'-month forecast')}${badge('₦ Naira (NGN)')}</div>`;}
-function kpi(label,val,detail,icon='↗',tone=''){return `<article class="card kpi"><div class="kpi-header">${escapeHTML(label)} <span class="kpi-icon">${icon}</span></div><div class="kpi-val ${tone}">${val}</div><div class="kpi-meta">${detail}</div></article>`;}
-function trendChart(rows,keys=['cash'],colors=['#455ddb','#16a085'],formatter=compact){
- const W=760,H=300,left=63,right=24,top=22,bottom=41,plotW=W-left-right,plotH=H-top-bottom;
- const values=rows.flatMap(r=>keys.map(k=>r[k]));let min=Math.min(...values,0),max=Math.max(...values,0);if(Math.abs(max-min)<1){max+=1;min-=1;}const pad=(max-min)*.07;max+=pad;min-=pad;
- const px=i=>left+(i/(Math.max(rows.length-1,1)))*plotW,py=v=>top+(max-v)/(max-min)*plotH;
- const grid=Array.from({length:5},(_,i)=>{const v=min+(max-min)*i/4,y=py(v);return `<line x1="${left}" y1="${y.toFixed(2)}" x2="${W-right}" y2="${y.toFixed(2)}" stroke="#ecf0f6"/><text x="${left-12}" y="${(y+4).toFixed(2)}" text-anchor="end" fill="#8a99ab" font-size="12">${formatter(v)}</text>`;}).join('');
- const axis=rows.filter((r,i)=>i===0||i===rows.length-1||i%Math.max(1,Math.ceil(rows.length/6))===0).map(r=>`<text x="${px(r.month-1).toFixed(2)}" y="${H-11}" fill="#8c99ac" font-size="12" text-anchor="middle">M${r.month}</text>`).join('');
- const lines=keys.map((k,j)=>{const points=rows.map((r,i)=>`${px(i).toFixed(2)},${py(r[k]).toFixed(2)}`).join(' ');const dots=rows.map((r,i)=>`<circle cx="${px(i).toFixed(2)}" cy="${py(r[k]).toFixed(2)}" r="3" fill="${colors[j]}" opacity="${rows.length>18?.4:.78}"><title>Month ${r.month}: ${currency(r[k])}</title></circle>`).join('');return `<polyline fill="none" stroke="${colors[j]}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${points}"/>${dots}`;}).join('');
- const zero= min<0&&max>0?`<line x1="${left}" x2="${W-right}" y1="${py(0)}" y2="${py(0)}" stroke="#a7b4ca" stroke-dasharray="4 5"/>`:'';
- return `<div class="chart" role="img" aria-label="Line chart showing ${keys.join(' and ')} for ${rows.length} months"><svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${grid}${zero}${axis}${lines}</svg></div>`;
-}
-function warningText(){return `<div class="warning"><strong>Modelling note:</strong> This is a deterministic planning tool using your assumptions, not verified local forecasts. Taxes, VAT, depreciation, inventory financing, receivable delays and demand-price elasticity are not included in this early engine. It does not predict guaranteed returns.</div>`;}
-function overview(){const {p,base,bs}=getModels(),f=bs.first,last=bs.last,fail=bs.fail;const line=trendChart(base,['revenue','profit','cash'],['#435ce3','#15a17d','#e0a13f']);
- return titleBlock('Your business, before you build it.',`Explore the financial outlook for ${escapeHTML(p.name)} with a working monthly model.`,actionBtn('Edit business inputs','setup','btn')+actionBtn('Run simulation →','simulation'))+context(p)+`<div class="kpi-grid">${kpi('First-month revenue',compact(f.revenue),'Based on demand and capacity','↗')}${kpi('First-month profit',compact(f.profit),'After operating expenses & loan interest','◈',f.profit>=0?'green':'red')}${kpi('Closing cash · M'+p.period,compact(last.cash),'After loan principal payments','◷',last.cash>=0?'green':'red')}${kpi('Cash shortfall',fail?'Month '+fail.month:'Not in horizon',fail?'Projected cash below ₦0':'No negative closing balance','⚑',fail?'red':'green')}</div>
- <div class="content-grid"><div class="card card-pad"><div class="card-head"><div><h2>Business performance forecast</h2><p>Projected month-by-month operating results</p></div><button class="mini-action" data-view="simulation">Full breakdown →</button></div>${line}<div class="legend"><span><i class="dot" style="background:#435ce3"></i>Revenue</span><span><i class="dot" style="background:#15a17d"></i>Net profit</span><span><i class="dot" style="background:#e0a13f"></i>Closing cash</span></div></div>
- <div class="card card-pad"><div class="card-head"><div><h2>At a glance</h2><p>Based on month one</p></div></div><div class="info-row"><span>Startup funds</span><strong>${currency(p.finance.funds)}</strong></div><div class="info-row"><span>Setup investment</span><strong>${currency(p.finance.setupCost)}</strong></div><div class="info-row"><span>Cash after setup</span><strong>${currency(bs.openingCash)}</strong></div><div class="info-row"><span>Business capacity use</span><strong>${pct(100*Math.min(p.ops.sales,p.ops.capacity)/Math.max(p.ops.capacity,1))}</strong></div><div class="progress"><div style="width:${Math.min(100,100*Math.min(p.ops.sales,p.ops.capacity)/Math.max(p.ops.capacity,1))}%"></div></div><div class="info-row"><span>Cash break-even per day*</span><strong>${Number.isFinite(f.bePerDay)?fmtN(f.bePerDay)+' units':'Not possible'}</strong></div><div class="info-row"><span>Loan balance · M${p.period}</span><strong>${currency(last.debt)}</strong></div><p class="micro muted">*Operating break-even includes interest but not principal. Negative cash may occur for other reasons.</p></div></div>
- <h2 class="section-title">Where do you want to go next?</h2><div class="recommendations"><div class="rec"><span class="rec-icon">⚙</span><div class="rec-head">Fine-tune assumptions</div><p>Change cash available, location, costs, pricing, demand, staffing and macro assumptions.</p><p style="margin-top:14px">${actionBtn('Business setup →','setup','btn-small')}</p></div><div class="rec"><span class="rec-icon">⑃</span><div class="rec-head">Stress-test the business</div><p>Explore rising costs, lower demand, growth opportunities or an entirely custom shock.</p><p style="margin-top:14px">${actionBtn('Compare scenarios →','scenarios','btn-small')}</p></div><div class="rec"><span class="rec-icon">▤</span><div class="rec-head">Study the numbers</div><p>See a monthly breakdown, read insights and export projections to CSV or JSON.</p><p style="margin-top:14px">${actionBtn('View reports →','reports','btn-small')}</p></div></div>${warningText()}`;
-}
-const SECTIONS={
- identity:{title:'Business & location',sub:'What business are you simulating, and where would it operate?',fields:[
-  ['name','Business or project name','text','e.g. Dine & Dash Kitchen'],['type','Business type','type'],['city','City','text','e.g. Lagos'],['area','Neighbourhood / commercial area','text','Optional e.g. Yaba'],['country','Country','country'],['period','Simulation duration','period']]},
- finance:{title:'Funding & financial position',sub:'Tell SimVest about the money available, startup spending and loans.',fields:[
-  ['finance.funds','Total funds available (₦)','number','Cash you can use, including any loan proceeds'],['finance.setupCost','One-time setup investment (₦)','number','Equipment, initial stock, deposits, fit-out and other launch costs'],['finance.debt','Outstanding loan balance (₦)','number','Debt included in your funding or existing business financing'],['finance.principal','Monthly principal repayment (₦)','number','Loan principal paid each month, excluding interest'],['finance.interest','Annual loan interest rate (%)','number','Nominal annual interest applied to outstanding balance']]},
- operations:{title:'Sales & operations',sub:'Model what you sell, your capacity and monthly running costs.',fields:[
-  ['ops.sales','__sales','number','Expected average sales volume per operating day'],['ops.capacity','__capacity','number','Maximum business capacity per operating day'],['ops.price','__price','number','Average amount charged per sale'],['ops.cost','__cost','number','Direct cost associated with each sale'],['ops.days','Operating days per month','number','Days you expect to be open every month'],['ops.payroll','Monthly salaries & staff costs (₦)','number','Including owner salary, if treated as a business expense'],['ops.rent','Monthly rent / premises (₦)','number','Average monthly rental and facility charges'],['ops.utilities','Monthly electricity & utilities (₦)','number','Power, generators, water, internet'],['ops.other','Other monthly fixed expenses (₦)','number','Marketing, insurance, admin and subscriptions']]},
- economy:{title:'Economic & local assumptions',sub:'Adjust how prices, demand and costs change over the forecast.',fields:[
-  ['economy.annualInflation','Annual cost inflation (%)','number','Illustrative annual increase in direct and operating costs'],['economy.monthlyDemandGrowth','Monthly demand growth (%)','number','Growth or decline in average daily sales volume'],['economy.monthlyPriceGrowth','Monthly selling price growth (%)','number','How much your own selling price rises each month'],['economy.localCostFactor','Local operating cost multiplier','number','1.0 keeps entered expenses as-is; 1.10 adds 10% to fixed costs']]}
-};
-function fieldHtml(field,p){let [path,name,type,help]=field,t=TYPE_INFO[p.type];if(name==='__sales')name=t.fields.sales;if(name==='__capacity')name=t.fields.capacity;if(name==='__price')name=t.fields.price;if(name==='__cost')name=t.fields.cost;
- const value=getPath(p,path),id='f_'+path.replaceAll('.','_');let input='';
- if(type==='type'){input=`<select id="${id}" data-path="${path}">${Object.entries(TYPE_INFO).map(([v,x])=>`<option value="${v}" ${p.type===v?'selected':''}>${x.icon} ${escapeHTML(x.name)}</option>`).join('')}</select>`;}
- else if(type==='period'){input=`<select id="${id}" data-path="${path}">${[12,24,36].map(x=>`<option value="${x}" ${p.period===x?'selected':''}>${x} months</option>`).join('')}</select>`;}
- else if(type==='country'){input=`<select id="${id}" data-path="${path}"><option value="Nigeria">Nigeria (MVP)</option></select>`;}
- else if(type==='number'){const negativeAllowed=['economy.monthlyDemandGrowth','economy.monthlyPriceGrowth','economy.annualInflation'].includes(path),min=negativeAllowed?-50:(path==='economy.localCostFactor'?.1:0),max=path==='ops.days'?31:path==='economy.localCostFactor'?3:100000000000;
- input=`<input id="${id}" type="number" inputmode="decimal" step="any" min="${min}" max="${max}" data-path="${path}" value="${escapeHTML(value)}">`;}
- else input=`<input id="${id}" type="text" maxlength="90" data-path="${path}" value="${escapeHTML(value)}" placeholder="${escapeHTML(help)}">`;
- return `<div class="field"><label for="${id}">${escapeHTML(name)}</label>${input}<div class="help">${escapeHTML(type==='text'?'Editable project detail':help||'')}</div></div>`;
-}
-function setup(){const p=state.project,s=SECTIONS[state.tab]||SECTIONS.identity,all=Object.keys(SECTIONS),idx=all.indexOf(state.tab),sectionTabs=all.map((k,i)=>`<button class="setup-tab ${k===state.tab?'active':''}" data-tab="${k}">${i+1}. ${SECTIONS[k].title}<span>→</span></button>`).join('');return titleBlock('Set up your business.','Start with a real business concept. Every field will feed into the simulation engine.',actionBtn('View live results →','simulation'))+context(p)+`<div class="form-layout"><div class="card setup-tabs">${sectionTabs}</div><section class="card card-pad"><div class="form-head"><div><h2>${escapeHTML(s.title)}</h2><p>${escapeHTML(s.sub)}</p></div><span class="pill">${idx+1} of ${all.length}</span></div><div class="field-grid">${s.fields.map(f=>fieldHtml(f,p)).join('')}</div><div class="form-note">${state.tab==='identity'?'Nigeria is the only supported country in this starter. City and neighbourhood are saved to your model; they do not automatically load verified local prices.':state.tab==='finance'?'The startup investment is deducted once from available funds. Interest is recorded as an expense and loan principal as a cash outflow.':state.tab==='operations'?'Direct unit costs scale with sales. Payroll, rent, utilities and other expenses are fixed monthly inputs.':'All economic inputs are editable planning assumptions, not live economic feeds.'}</div><div class="form-actions"><button class="btn" data-tab="${all[Math.max(0,idx-1)]}" ${idx===0?'disabled':''}>← Previous section</button><button class="btn btn-primary" data-action="nextSetup">${idx===all.length-1?'Run simulation →':'Save & continue →'}</button></div></section></div>${warningText()}`;}
-function simulation(){const {p,base,bs}=getModels(),last=bs.last;const metric=state.metric;const labels={cash:'Closing cash',revenue:'Revenue',profit:'Net profit',cashflow:'Net cash flow'};const vals=['cash','revenue','profit','cashflow'];const mSwitch=vals.map(m=>`<button data-metric="${m}" class="switch ${metric===m?'active':''}">${labels[m]}</button>`).join('');
- const head=['Month','Revenue','Direct costs','Fixed expenses','Interest','Profit','Principal paid','Cash flow','Closing cash'];const table=`<div class="table-wrap"><table class="data-table"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${base.map(r=>`<tr><td>M${r.month}</td><td>${currency(r.revenue)}</td><td>${currency(r.cogs)}</td><td>${currency(r.fixed)}</td><td>${currency(r.interest)}</td><td class="${r.profit<0?'red':'green'}">${currency(r.profit)}</td><td>${currency(r.principal)}</td><td>${currency(r.cashflow)}</td><td class="${r.cash<0?'red':''}"><strong>${currency(r.cash)}</strong></td></tr>`).join('')}</tbody></table></div>`;
- return titleBlock('Your business simulation.',`A transparent ${p.period}-month deterministic forecast built from the figures you entered.`,actionBtn('Change inputs','setup','btn')+'<button class="btn btn-primary" data-action="exportCsv">Export CSV ↓</button>')+context(p)+`<div class="kpi-grid">${kpi('Total forecast revenue',compact(bs.totalRevenue),'Across '+p.period+' months','↗')}${kpi('Total net profit',compact(bs.totalProfit),'After loan interest','◈',bs.totalProfit>=0?'green':'red')}${kpi('Forecast profit margin',pct(bs.margin),'Cumulative net profit / sales','%')}${kpi('End-of-period cash',compact(last.cash),'Closing balance after repayments','◷',last.cash>=0?'green':'red')}</div><div class="card card-pad" style="margin-bottom:19px"><div class="card-head"><div><h2>${labels[metric]} over time</h2><p>Hover/tap chart points to inspect monthly results</p></div><div class="metric-switch">${mSwitch}</div></div>${trendChart(base,[metric],['#435ce3'])}</div><div class="card card-pad"><div class="card-head"><div><h2>Monthly financial statement</h2><p>Scroll horizontally to view every figure</p></div><button class="mini-action" data-action="exportCsv">Download data ↓</button></div>${table}</div>${warningText()}`;
-}
-function compareStats(label,b,s){let change=s-b;return `<div class="comp-stat"><div class="label">${label}</div><div class="value">${compact(s)}</div><div class="change ${change>=0?'green':'red'}">${change>=0?'+':''}${compact(change)} versus base</div></div>`;}
-function scenarios(){const {p,base,selected,bs,ss}=getModels(),selection=selectedShock(),options=Object.entries(SCENARIOS).map(([key,s])=>`<button class="scenario-card ${key===state.scenario?'active':''}" data-scenario="${key}"><span class="scenario-badge">${key==='base'?'BASE CASE':key==='custom'?'YOUR SETTINGS':'WHAT-IF'}</span><strong>${escapeHTML(s.name)}</strong><p>${escapeHTML(s.blurb)}</p></button>`).join('');
- const configFields=[['volume','Demand change (%)',-90,100],['cost','Unit cost change (%)',-80,150],['price','Selling price change (%)',-70,100],['fixed','Fixed expense change (%)',-70,150],['month','Shock starts in month',1,p.period]];const ranges=configFields.map(([key,label,min,max])=>`<div class="range-row"><label for="range_${key}">${label}<strong>${state.project.custom[key]}${key==='month'?'':'%'}</strong></label><input id="range_${key}" type="range" data-custom="${key}" min="${min}" max="${max}" value="${state.project.custom[key]}" step="1"></div>`).join('');
- return titleBlock('Stress-test decisions.','Compare your original plan against adverse and favourable scenarios.')+context(p)+`<div class="scenario-grid">${options}</div><div class="scenarios-content"><div class="card card-pad"><div class="card-head"><div><h2>Custom scenario builder</h2><p>Edit sliders to create your own stress test</p></div></div>${ranges}<div class="info-banner">A change is applied from the selected month onward. The simulator limits realised sales to operating capacity.</div><p style="margin:17px 0 0"><button class="btn btn-primary" data-action="useCustom">Apply custom scenario →</button></p></div><div class="card card-pad"><div class="card-head"><div><h2>${escapeHTML(SCENARIOS[state.scenario].name)} vs base case</h2><p>Projected closing cash balances across ${p.period} months</p></div></div>${trendChart(base.map((r,i)=>({...r,cashSelected:selected[i].cash})),['cash','cashSelected'],['#9aaad6','#435ce3'])}<div class="legend"><span><i class="dot" style="background:#9aaad6"></i>Base case</span><span><i class="dot" style="background:#435ce3"></i>Selected scenario</span></div><div class="comp-grid" style="margin-top:20px">${compareStats('Total revenue',bs.totalRevenue,ss.totalRevenue)}${compareStats('Total profit',bs.totalProfit,ss.totalProfit)}${compareStats('Final cash',bs.last.cash,ss.last.cash)}</div><p class="micro muted">Active shocks: ${selection.volume||0}% demand, ${selection.cost||0}% unit cost, ${selection.price||0}% price, ${selection.fixed||0}% fixed expenses from month ${selection.month||1}.</p></div></div>${warningText()}`;
-}
-function reportInsights(p,rows,s){let first=rows[0],last=rows.at(-1),items=[];if(p.finance.setupCost>p.finance.funds)items.push(['Startup funding gap',`One-time setup costs exceed available funds by ${currency(p.finance.setupCost-p.finance.funds)}. The initial cash balance begins negative.`]);
- if(s.fail)items.push(['Cash shortfall',`Projected closing cash is negative in month ${s.fail.month} (${currency(s.fail.cash)}). Consider reducing costs or increasing funding.`]);
- else items.push(['Cash position',`The model does not show a negative month-end cash balance within your ${p.period}-month horizon. This does not eliminate business risk.`]);
- if(first.profit<0)items.push(['First-month profitability',`Operating assumptions produce a ${currency(Math.abs(first.profit))} net loss in month one.`]);else items.push(['First-month profitability',`Estimated month-one net profit is ${currency(first.profit)} at ${fmtN(first.units)} units sold.`]);
- if(first.bePerDay>p.ops.capacity)items.push(['Break-even above capacity',`Estimated break-even volume of ${fmtN(first.bePerDay)} per day exceeds your capacity of ${fmtN(p.ops.capacity)}. Revisit pricing or cost assumptions.`]);else if(Number.isFinite(first.bePerDay))items.push(['Break-even volume',`Approximately ${fmtN(first.bePerDay)} sales per working day are needed to cover fixed expenses, direct costs and loan interest in month one.`]);
- if(p.ops.sales>p.ops.capacity)items.push(['Capacity constraint',`You entered ${fmtN(p.ops.sales)} potential sales per day but capacity is only ${fmtN(p.ops.capacity)}. The model caps sales at capacity.`]);
- if(p.finance.debt>0)items.push(['Outstanding debt',`After ${p.period} months, estimated remaining loan principal is ${currency(last.debt)}. Interest is calculated on the declining balance.`]);
- items.push(['Inflation assumption',`Annual cost inflation is set to ${pct(p.economy.annualInflation)}, a user-adjustable assumption. It increases both unit and fixed costs through the forecast.`]);
- items.push(['Model coverage',`Includes monthly revenue, direct costs, recurring expenses, loan interest, principal repayments and closing cash. Excludes VAT/tax, depreciation, stock financing and delayed customer payments.`]);
- return items;
-}
-function reports(){const {p,base,bs,ss}=getModels(),insights=reportInsights(p,base,bs);return titleBlock('Reports & business insights.','Understand the numbers, see weaknesses in your assumptions and export the working model.','<button class="btn" data-action="print">Print report</button><button class="btn btn-primary" data-action="exportCsv">Export CSV ↓</button>')+context(p)+`<div class="kpi-grid">${kpi('Initial cash',compact(bs.openingCash),'Available funds less setup investment','◷',bs.openingCash<0?'red':'')}${kpi('Total forecast revenue',compact(bs.totalRevenue),p.period+' months','↗')}${kpi('Cumulative net profit',compact(bs.totalProfit),p.period+' months','◈',bs.totalProfit<0?'red':'green')}${kpi('Ending debt',compact(bs.last.debt),'Unpaid loan principal','⇄')}</div><div class="content-grid"><div class="card card-pad"><div class="card-head"><div><h2>Business assessment</h2><p>Deterministic observations, not AI investment advice</p></div></div><div class="report-list">${insights.map(([h,d])=>`<div class="report-item"><span class="bulb">◈</span><div><strong>${escapeHTML(h)}</strong><p>${escapeHTML(d)}</p></div></div>`).join('')}</div></div><div class="card card-pad"><div class="card-head"><div><h2>Current assumptions</h2><p>Inputs used in the forecast</p></div></div><div class="info-row"><span>Business</span><strong>${escapeHTML(TYPE_INFO[p.type].name)}</strong></div><div class="info-row"><span>Location</span><strong>${escapeHTML(p.area?p.area+', '+p.city:p.city)}</strong></div><div class="info-row"><span>Sale price</span><strong>${currency(p.ops.price)}</strong></div><div class="info-row"><span>Expected daily sales</span><strong>${fmtN(p.ops.sales)}</strong></div><div class="info-row"><span>Monthly fixed expenses</span><strong>${currency((p.ops.payroll+p.ops.rent+p.ops.utilities+p.ops.other)*p.economy.localCostFactor)}</strong></div><div class="info-row"><span>Cost inflation</span><strong>${pct(p.economy.annualInflation)} / year</strong></div><div class="info-row"><span>Demand growth</span><strong>${pct(p.economy.monthlyDemandGrowth)} / month</strong></div><div class="feature-list" style="margin-top:17px"><span>Download a CSV for spreadsheet analysis</span><span>Download your project inputs as JSON</span><span>Print or save this summary as PDF using browser print</span></div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px"><button class="btn btn-primary btn-small" data-action="exportJson">Export JSON</button><button class="btn btn-small" data-action="saveProject">Save project</button></div></div></div>${warningText()}`;}
-function saved(){const all=projects(),cards=all.map(x=>`<div class="card saved-card"><div class="eyebrow">${TYPE_INFO[x.project.type]?.short||'Business'} • ${escapeHTML(x.project.city)}</div><h3>${escapeHTML(x.name)}</h3><p>Saved ${new Date(x.savedAt).toLocaleString('en-NG')} · ${x.project.period} months</p><div class="saved-actions"><button class="btn btn-primary btn-small" data-action="loadProject" data-id="${escapeHTML(x.id)}">Open</button><button class="btn btn-small" data-action="duplicateProject" data-id="${escapeHTML(x.id)}">Duplicate</button><button class="btn btn-small btn-danger" data-action="deleteProject" data-id="${escapeHTML(x.id)}">Delete</button></div></div>`).join('');return titleBlock('Your saved simulations.','Projects are stored only in this browser until a backend and accounts are connected.','<button class="btn" data-action="createProject">+ New project</button><button class="btn" data-action="importProject">Import JSON</button><button class="btn btn-primary" data-action="saveProject">Save current project</button>')+`<input id="importProjectFile" type="file" accept="application/json,.json" hidden>${all.length?`<div class="saved-grid">${cards}</div>`:`<div class="empty"><strong>No saved projects yet</strong><p>Click “Save current project” to keep an editable snapshot in this browser.</p><button class="btn btn-primary" data-action="saveProject">Save current project</button></div>`}<div class="warning"><strong>Local-only storage:</strong> saved projects are not synced to other devices or protected with an account. Export JSON to keep a backup. Clearing your browser data can delete local projects.</div>`;}
-function getPath(obj,path){return path.split('.').reduce((x,k)=>x?.[k],obj);}
-function setPath(obj,path,val){const keys=path.split('.');let x=obj;for(const k of keys.slice(0,-1))x=x[k];x[keys.at(-1)]=val;}
-function navigate(view){if(!NAMES[view])return;state.view=view;el('sidebar').classList.remove('open');el('mobileScrim').classList.remove('show');render();window.scrollTo({top:0,behavior:'instant'});}
-function render(){const root=el('viewRoot');root.innerHTML=`<div class="container">${({overview,setup,simulation,scenarios,reports,saved}[state.view])()}</div>`;el('crumb').textContent=NAMES[state.view];document.querySelectorAll('.nav-item').forEach(e=>e.classList.toggle('active',e.dataset.view===state.view));document.title='SimVest — '+NAMES[state.view];}
-function changeType(type){const old=state.project,t=TYPE_INFO[type];if(!t)return;const next=newProject(type);next.name=old.name===('My '+TYPE_INFO[old.type].short+' simulation')?'My '+t.short+' simulation':old.name;next.city=old.city;next.area=old.area;next.period=old.period;next.finance.funds=old.finance.funds;next.finance.debt=old.finance.debt;next.finance.principal=old.finance.principal;next.finance.interest=old.finance.interest;next.economy=clone(old.economy);next.custom=clone(old.custom);next.id='draft';state.project=next;saveDraft();notify('Business module switched; operating defaults updated.');}
-function download(filename,content,mime){const blob=new Blob([content],{type:mime});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
-function csv(){const p=state.project,rows=projection(p,SCENARIOS.base);const cols=['month','openingCash','units','revenue','cogs','fixed','interest','operatingProfit','profit','principal','cashflow','cash','debt','bePerDay'];const out=[cols.join(','),...rows.map(r=>cols.map(c=>Number.isFinite(r[c])?Math.round(r[c]*100)/100:'').join(','))].join('\n');download('simvest-'+p.type+'-simulation.csv',out,'text/csv;charset=utf-8');notify('Monthly forecast exported.');}
-function saveCurrent(){const p=clone(state.project),all=projects(),name=(prompt('Name this saved project:',p.name)||'').trim();if(!name)return;const id='sv-'+Date.now()+'-'+Math.floor(Math.random()*10000);p.id=id;all.unshift({id,name,savedAt:new Date().toISOString(),project:p});if(putProjects(all)){state.project=p;saveDraft();notify('Project saved in this browser.');if(state.view==='saved')render();}}
-function handleAction(e){const b=e.target.closest('button');if(!b)return;
- if(b.dataset.view){navigate(b.dataset.view);return;}
- if(b.dataset.tab){state.tab=b.dataset.tab;render();return;}
- if(b.dataset.metric){state.metric=b.dataset.metric;render();return;}
- if(b.dataset.scenario){state.scenario=b.dataset.scenario;render();return;}
- const act=b.dataset.action,id=b.dataset.id;
- if(act==='nextSetup'){const keys=Object.keys(SECTIONS),i=keys.indexOf(state.tab);saveDraft();if(i<keys.length-1){state.tab=keys[i+1];render();}else navigate('simulation');return;}
- if(act==='useCustom'){state.scenario='custom';render();notify('Custom assumptions applied.');return;}
- if(act==='exportCsv'){csv();return;}
- if(act==='exportJson'){download('simvest-'+state.project.type+'-project.json',JSON.stringify({format:'simvest-v0.2',exportedAt:new Date().toISOString(),project:state.project},null,2),'application/json');notify('Project JSON exported.');return;}
- if(act==='print'){window.print();return;}
- if(act==='saveProject'){saveCurrent();return;}
- if(act==='importProject'){el('importProjectFile')?.click();return;}
- if(act==='createProject'){if(!confirm('Start a new project? Save the current one first if you want to keep it.'))return;state.project=newProject();state.tab='identity';state.scenario='base';saveDraft();navigate('setup');notify('New business draft created.');return;}
- if(act==='loadProject'){const saved=projects().find(x=>x.id===id);if(saved){state.project=clone(saved.project);saveDraft();navigate('overview');notify('Saved project loaded.');}return;}
- if(act==='duplicateProject'){const x=projects().find(x=>x.id===id);if(x){state.project=clone(x.project);state.project.name=x.name+' (copy)';state.project.id='draft';saveDraft();navigate('setup');notify('Project copied to editable draft.');}return;}
- if(act==='deleteProject'){const list=projects(),x=list.find(x=>x.id===id);if(x&&confirm('Delete "'+x.name+'" from this browser?')){putProjects(list.filter(z=>z.id!==id));render();notify('Saved project deleted.');}return;}
-}
-function updateField(e){const target=e.target,path=target.dataset.path;if(!path)return;
- if(path==='type'){changeType(target.value);render();return;}
- let value=target.value;
- if(target.type==='number'||path==='period'){
-  const min=target.min!==''?Number(target.min):0,max=target.max!==''?Number(target.max):100000000000;
-  value=numeric(value,min,max);if(path==='period')value=Math.round(value);target.value=value;
- }else value=value.slice(0,90);
- setPath(state.project,path,value);saveDraft();
-}
-function updateRange(e){const t=e.target;if(!t.dataset.custom)return;state.project.custom[t.dataset.custom]=Number(t.value);state.scenario='custom';saveDraft();const valueEl=t.closest('.range-row')?.querySelector('strong');if(valueEl)valueEl.textContent=t.value+(t.dataset.custom==='month'?'':'%');}
-function finishRange(e){if(!e.target.dataset.custom)return;state.scenario='custom';render();}
-el('mainNav').addEventListener('click',handleAction);el('viewRoot').addEventListener('click',handleAction);
-el('viewRoot').addEventListener('change',updateField);
-el('viewRoot').addEventListener('input',e=>{if(e.target.matches('[data-custom]'))updateRange(e);});
-el('viewRoot').addEventListener('change',finishRange);
-el('viewRoot').addEventListener('change',async e=>{if(e.target.id!=='importProjectFile'||!e.target.files?.length)return;try{const contents=await e.target.files[0].text(),data=JSON.parse(contents),p=data.project||data;if(!p||!TYPE_INFO[p.type]||!p.finance||!p.ops||!p.economy||!p.custom)throw Error('Invalid SimVest project');state.project={...newProject(p.type),...p,id:'draft'};state.scenario='base';state.tab='identity';saveDraft();navigate('setup');notify('Project imported from JSON.');}catch(_){notify('Could not import: choose a valid SimVest project JSON file.');}});
-el('menuToggle').addEventListener('click',()=>{el('sidebar').classList.toggle('open');el('mobileScrim').classList.toggle('show');});el('mobileScrim').addEventListener('click',()=>{el('sidebar').classList.remove('open');el('mobileScrim').classList.remove('show');});
-el('newProjectTop').addEventListener('click',()=>{if(!confirm('Start a new project? Save your current project first if you want to keep it.'))return;state.project=newProject();state.tab='identity';state.scenario='base';saveDraft();navigate('setup');notify('New business draft created.');});
-el('saveTop').addEventListener('click',saveCurrent);
-window.SimVestDemo={projection,newProject,stats,types:TYPE_INFO,scenarios:SCENARIOS,getState:()=>clone(state)}; // local dev inspection
-render();
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const DB = window.SimVestData;
+
+  if (!DB) {
+    throw Error(
+      'economic-data.js must load before app.js'
+    );
+  }
+
+  const DRAFT_KEY = 'simvest_draft_v05';
+  const SAVE_KEY = 'simvest_projects_v05';
+
+  const defaults = {
+    name: 'My retail business',
+    category: 'provisions',
+    city: 'Lagos',
+    area: '',
+    start: '2023-01',
+    months: 12,
+
+    capital: 5000000,
+    loan: 0,
+    annualInterest: 18,
+    loanTerm: 24,
+    setupCost: 1000000,
+
+    price: 5500,
+    unitCost: 3600,
+    dailyDemand: 35,
+    dailyCapacity: 90,
+    openDays: 26,
+
+    openingUnits: 300,
+    monthlyPurchases: 950,
+    shrinkage: 1,
+
+    rent: 180000,
+    salaries: 240000,
+    electricity: 70000,
+    otherCosts: 95000,
+
+    annualInflation: 20,
+    demandGrowth: 0,
+    priceGrowth: 0,
+    fxShare: 0,
+    fuelShare: 0,
+
+    custom: {
+      demand: -15,
+      cost: 15,
+      price: 0,
+      fixed: 0,
+      month: 4
+    }
+  };
+
+  const categories = {
+    provisions: {
+      label: 'Provision store / mini-mart',
+      price: 5500,
+      cost: 3600,
+      demand: 35,
+      capacity: 90,
+      stock: 300,
+      buy: 950
+    },
+
+    supermarket: {
+      label: 'Supermarket',
+      price: 6800,
+      cost: 4750,
+      demand: 95,
+      capacity: 220,
+      stock: 700,
+      buy: 2500
+    },
+
+    electronics: {
+      label: 'Electronics and devices',
+      price: 95000,
+      cost: 78500,
+      demand: 5,
+      capacity: 22,
+      stock: 35,
+      buy: 130
+    },
+
+    pharmacy: {
+      label: 'Pharmacy / health retail',
+      price: 8200,
+      cost: 5900,
+      demand: 65,
+      capacity: 130,
+      stock: 300,
+      buy: 1700
+    },
+
+    fashion: {
+      label: 'Fashion and clothing',
+      price: 18500,
+      cost: 10700,
+      demand: 15,
+      capacity: 50,
+      stock: 200,
+      buy: 380
+    },
+
+    ecommerce: {
+      label: 'Online retail (own inventory)',
+      price: 12000,
+      cost: 8000,
+      demand: 25,
+      capacity: 80,
+      stock: 230,
+      buy: 700
+    },
+
+    wholesale: {
+      label: 'Wholesale / distribution',
+      price: 34000,
+      cost: 28900,
+      demand: 12,
+      capacity: 45,
+      stock: 160,
+      buy: 310
+    }
+  };
+
+  const cases = {
+    base: {
+      label: 'Base case',
+      detail: 'Business as entered',
+      demand: 0,
+      cost: 0,
+      price: 0,
+      fixed: 0,
+      month: 1
+    },
+
+    demand: {
+      label: 'Demand drop',
+      detail: 'Sales volume −25% from month 4',
+      demand: -25,
+      cost: 0,
+      price: 0,
+      fixed: 0,
+      month: 4
+    },
+
+    costs: {
+      label: 'Cost shock',
+      detail: 'Purchase cost +25%, expenses +10%',
+      demand: 0,
+      cost: 25,
+      price: 0,
+      fixed: 10,
+      month: 4
+    },
+
+    growth: {
+      label: 'Growth',
+      detail: 'Demand +20%, expenses +10%',
+      demand: 20,
+      cost: 0,
+      price: 0,
+      fixed: 10,
+      month: 4
+    },
+
+    custom: {
+      label: 'Custom scenario',
+      detail: 'Choose your own changes'
+    }
+  };
+
+  const names = {
+    dashboard: 'Dashboard',
+    setup: 'Business setup',
+    simulation: 'Simulation',
+    scenarios: 'Scenarios',
+    data: 'Economic data',
+    saved: 'Saved projects'
+  };
+
+  const read = (key, fallback) => {
+    try {
+      return JSON.parse(localStorage.getItem(key)) ??
+        fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const store = (key, value) => {
+    try {
+      localStorage.setItem(
+        key,
+        JSON.stringify(value)
+      );
+    } catch {
+      toast('Browser storage unavailable');
+    }
+  };
+
+  const escape = value =>
+    String(value ?? '').replace(
+      /[&<>"']/g,
+      c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[c]
+    );
+
+  const clamp = (v, min = 0, max = 1e12) =>
+    Math.min(
+      max,
+      Math.max(min, Number(v) || 0)
+    );
+
+  const money = n =>
+    (n < 0 ? '−' : '') +
+    '₦' +
+    Math.round(
+      Math.abs(n || 0)
+    ).toLocaleString('en-NG');
+
+  const short = n => {
+    const a = Math.abs(n || 0);
+
+    return (n < 0 ? '−₦' : '₦') +
+      (
+        a >= 1e9
+          ? (a / 1e9).toFixed(2) + 'bn'
+          : a >= 1e6
+          ? (a / 1e6).toFixed(2) + 'm'
+          : a >= 1000
+          ? (a / 1000).toFixed(1) + 'k'
+          : Math.round(a)
+      );
+  };
+
+  const monthAt = (start, i) => {
+    const [y, m] = start.split('-').map(Number);
+
+    return new Date(
+      Date.UTC(y, m - 1 + i, 1)
+    ).toISOString().slice(0, 7);
+  };
+
+  let p = {
+    ...defaults,
+    ...read(DRAFT_KEY, {})
+  };
+
+  p.custom = {
+    ...defaults.custom,
+    ...p.custom
+  };
+
+  let page = 'dashboard';
+  let scenario = 'base';
+  let chartMetric = 'cash';
+
+  function toast(message) {
+    const el = $('toast');
+
+    el.textContent = message;
+    el.classList.add('show');
+
+    clearTimeout(toast.timer);
+
+    toast.timer = setTimeout(() => {
+      el.classList.remove('show');
+    }, 2600);
+  }
+
+  // ---------------------------------------
+  // FINANCIAL SIMULATION ENGINE
+  // ---------------------------------------
+
+  function simulate(
+    data = p,
+    scenarioName = 'base'
+  ) {
+    const chosen =
+      scenarioName === 'custom'
+        ? data.custom
+        : cases[scenarioName];
+
+    const rows = [];
+
+    let cash =
+      clamp(data.capital) +
+      clamp(data.loan) -
+      clamp(data.setupCost) -
+      clamp(data.openingUnits) *
+      clamp(data.unitCost);
+
+    let stock = clamp(data.openingUnits);
+    let avgCost = clamp(data.unitCost);
+
+    let purchaseCost = clamp(data.unitCost);
+    let price = clamp(data.price);
+    let demand = clamp(data.dailyDemand);
+
+    let fixedCosts =
+      clamp(data.rent) +
+      clamp(data.salaries) +
+      clamp(data.electricity) +
+      clamp(data.otherCosts);
+
+    let balance = clamp(data.loan);
+
+    const rate =
+      clamp(data.annualInterest) / 1200;
+
+    const term = Math.max(
+      1,
+      clamp(data.loanTerm, 1, 360)
+    );
+
+    const payment =
+      balance === 0
+        ? 0
+        : rate > 0
+        ? balance * rate /
+          (1 - Math.pow(1 + rate, -term))
+        : balance / term;
+
+    for (
+      let i = 0;
+      i < clamp(data.months, 1, 36);
+      i++
+    ) {
+      const month = monthAt(
+        data.start,
+        i
+      );
+
+      const economic = DB.changes(
+        month,
+        data.annualInflation,
+        data.fxShare,
+        data.fuelShare
+      );
+
+      // Update business costs after month 1.
+      if (i > 0) {
+        purchaseCost *=
+          economic.procurementFactor;
+
+        fixedCosts *=
+          economic.fixedFactor;
+
+        price *=
+          1 +
+          clamp(
+            data.priceGrowth,
+            -90,
+            500
+          ) / 100;
+
+        demand *=
+          1 +
+          clamp(
+            data.demandGrowth,
+            -90,
+            500
+          ) / 100;
+      }
+
+      const shock =
+        i + 1 >= Number(chosen.month)
+          ? chosen
+          : cases.base;
+
+      const shockCost = Math.max(
+        .1,
+        1 +
+        Number(shock.cost || 0) / 100
+      );
+
+      const demandUnits = Math.max(
+        0,
+        demand *
+          Math.max(
+            0,
+            1 +
+            Number(shock.demand || 0) / 100
+          )
+      );
+
+      const desiredSales =
+        Math.min(
+          demandUnits,
+          clamp(data.dailyCapacity)
+        ) *
+        clamp(data.openDays, 0, 31);
+
+      // Stock purchasing
+      const bought =
+        clamp(data.monthlyPurchases);
+
+      const purchaseCash =
+        bought *
+        purchaseCost *
+        shockCost;
+
+      const stockValue =
+        stock * avgCost +
+        purchaseCash;
+
+      const available =
+        stock + bought;
+
+      avgCost =
+        available > 0
+          ? stockValue / available
+          : 0;
+
+      const lost = Math.min(
+        available,
+        available *
+          clamp(
+            data.shrinkage,
+            0,
+            100
+          ) / 100
+      );
+
+      const sellable =
+        available - lost;
+
+      const sold = Math.min(
+        desiredSales,
+        sellable
+      );
+
+      stock =
+        sellable - sold;
+
+      // Revenue
+      const sales =
+        sold *
+        price *
+        Math.max(
+          0,
+          1 +
+          Number(shock.price || 0) / 100
+        );
+
+      // Inventory expense
+      const costOfSales =
+        (sold + lost) * avgCost;
+
+      const expenses =
+        fixedCosts *
+        Math.max(
+          0,
+          1 +
+          Number(shock.fixed || 0) / 100
+        );
+
+      // Loan calculations
+      const interest =
+        balance * rate;
+
+      const principal = Math.min(
+        balance,
+        Math.max(
+          0,
+          payment - interest
+        )
+      );
+
+      const debtPaid =
+        balance > 0
+          ? principal + interest
+          : 0;
+
+      balance = Math.max(
+        0,
+        balance - principal
+      );
+
+      // Profit and cash are different.
+      const profit =
+        sales -
+        costOfSales -
+        expenses -
+        interest;
+
+      cash +=
+        sales -
+        purchaseCash -
+        expenses -
+        debtPaid;
+
+      rows.push({
+        month,
+        sales,
+        costOfSales,
+        expenses,
+        interest,
+        profit,
+        cash,
+        stock,
+        inventoryValue: stock * avgCost,
+        sold,
+        missed: Math.max(
+          0,
+          desiredSales - sold
+        ),
+        debt: balance,
+        purchaseCash,
+        cpiStatus: economic.cpiStatus
+      });
+    }
+
+    return rows;
+  }
+
+  function summary(rows) {
+    const total = key =>
+      rows.reduce(
+        (a, row) => a + row[key],
+        0
+      );
+
+    const end = rows.at(-1);
+
+    return {
+      revenue: total('sales'),
+      profit: total('profit'),
+      cash: end.cash,
+      inventory: end.inventoryValue,
+      missed: total('missed')
+    };
+  }
+
+  // ---------------------------------------
+  // USER INTERFACE COMPONENTS
+  // ---------------------------------------
+
+  function heading(
+    title,
+    subtitle,
+    buttons = ''
+  ) {
+    return `
+      <div class="heading">
+        <div>
+          <div class="eyebrow">
+            SIMVEST / RETAIL & COMMERCE
+          </div>
+          <h1>${title}</h1>
+          <p>${subtitle}</p>
+        </div>
+        <div class="actions">
+          ${buttons}
+        </div>
+      </div>
+    `;
+  }
+
+  function button(
+    text,
+    destination,
+    primary = false
+  ) {
+    return `
+      <button
+        class="btn ${primary ? 'primary' : ''}"
+        data-goto="${destination}">
+        ${text}
+      </button>
+    `;
+  }
+
+  function tile(
+    title,
+    value,
+    detail = ''
+  ) {
+    return `
+      <div class="card kpi">
+        <label>${title}</label>
+        <strong>${value}</strong>
+        <small>${detail}</small>
+      </div>
+    `;
+  }
+
+  function field(
+    label,
+    key,
+    type = 'number'
+  ) {
+    return `
+      <div class="field">
+        <label for="f_${key}">
+          ${label}
+        </label>
+
+        <input
+          id="f_${key}"
+          data-key="${key}"
+          type="${type}"
+          ${type === 'number'
+            ? 'step="any"'
+            : ''}
+          value="${escape(p[key])}">
+      </div>
+    `;
+  }
+
+  function select(label, key, choices) {
+    return `
+      <div class="field">
+        <label for="f_${key}">
+          ${label}
+        </label>
+
+        <select
+          id="f_${key}"
+          data-key="${key}">
+
+          ${choices.map(
+            ([value, name]) => `
+              <option
+                value="${escape(value)}"
+                ${String(value) === String(p[key])
+                  ? 'selected'
+                  : ''}>
+                ${escape(name)}
+              </option>
+            `
+          ).join('')}
+        </select>
+      </div>
+    `;
+  }
+
+  function block(title, fields) {
+    return `
+      <section class="card pad">
+        <h2>${title}</h2>
+        <div class="form">
+          ${fields.join('')}
+        </div>
+      </section>
+    `;
+  }
+
+  function chart(
+    rows,
+    metric,
+    comparison = null
+  ) {
+    const list = rows
+      .map(r => r[metric])
+      .concat(
+        comparison
+          ? comparison.map(r => r[metric])
+          : []
+      );
+
+    const low = Math.min(...list);
+    const high = Math.max(...list);
+    const span = high - low || 1;
+
+    const x = i =>
+      42 +
+      i * 665 /
+      Math.max(1, rows.length - 1);
+
+    const y = v =>
+      224 -
+      178 * (v - low) / span;
+
+    const trace = data =>
+      data.map(
+        (r, i) =>
+          `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(r[metric]).toFixed(1)}`
+      ).join(' ');
+
+    return `
+      <div class="chart">
+        <svg
+          viewBox="0 0 760 260"
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="${escape(metric)} projection chart">
+
+          <line x1="42" y1="224"
+            x2="710" y2="224"
+            stroke="#dfe5f0"/>
+
+          <line x1="42" y1="46"
+            x2="710" y2="46"
+            stroke="#e3e8f1"
+            stroke-dasharray="4 5"/>
+
+          <text x="4" y="49">
+            ${escape(short(high))}
+          </text>
+
+          <text x="4" y="227">
+            ${escape(short(low))}
+          </text>
+
+          <path
+            d="${trace(rows)}"
+            fill="none"
+            stroke="#5369e5"
+            stroke-width="3"/>
+
+          ${comparison ? `
+            <path
+              d="${trace(comparison)}"
+              fill="none"
+              stroke="#18a39b"
+              stroke-width="3"
+              stroke-dasharray="7 5"/>
+          ` : ''}
+
+          <text x="42" y="248">
+            ${rows[0].month}
+          </text>
+
+          <text x="635" y="248">
+            ${rows.at(-1).month}
+          </text>
+        </svg>
+      </div>
+
+      <div class="legend">
+        <span class="dot"></span>
+        ${comparison
+          ? 'Base case &nbsp;&nbsp; <span class="dot alt"></span>Scenario'
+          : 'Simulation'}
+      </div>
+    `;
+  }
+
+  // ---------------------------------------
+  // DASHBOARD PAGE
+  // ---------------------------------------
+
+  function dashboard() {
+    const rows = simulate();
+    const s = summary(rows);
+
+    return heading(
+      'Business overview',
+      'A working financial and inventory simulation using editable inputs.',
+      button(
+        'Business setup',
+        'setup'
+      ) +
+      button(
+        'Run simulation',
+        'simulation',
+        true
+      )
+    ) + `
+      <div class="grid kpis">
+        ${tile(
+          'Total revenue',
+          short(s.revenue),
+          p.months + ' months'
+        )}
+
+        ${tile(
+          'Profit before tax',
+          short(s.profit),
+          'Includes interest'
+        )}
+
+        ${tile(
+          'Closing cash',
+          short(s.cash),
+          'After inventory and debt payments'
+        )}
+
+        ${tile(
+          'Ending inventory',
+          short(s.inventory),
+          'At modelled average cost'
+        )}
+      </div>
+
+      <div class="grid two">
+        <section class="card pad">
+          <h2>Projected cash balance</h2>
+          ${chart(rows, 'cash')}
+        </section>
+
+        <section class="card pad">
+          <h2>Current business</h2>
+
+          <p>
+            <b>
+              ${escape(categories[p.category].label)}
+            </b>
+          </p>
+
+          <p class="hint">
+            📍 ${escape(p.area || p.city)}, Nigeria
+          </p>
+
+          <p class="hint">
+            Capital: ${money(p.capital)}
+          </p>
+
+          <p class="hint">
+            Sales demand:
+            ${p.dailyDemand} units/day
+          </p>
+
+          <p class="hint">
+            Opening stock:
+            ${p.openingUnits} units
+          </p>
+
+          <div class="notice warning">
+            Model results are estimates.
+            No actual company records or live
+            official Nigerian prices are preloaded.
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  // ---------------------------------------
+  // BUSINESS SETUP PAGE
+  // ---------------------------------------
+
+  function setup() {
+    return heading(
+      'Business setup',
+      'Edit the parameters used for every monthly simulation.',
+      button(
+        'View simulation',
+        'simulation',
+        true
+      )
+    ) + `
+      <div class="grid two">
+        <div class="stack">
+
+          ${block(
+            '1. Business identity & location',
+            [
+              field('Business name', 'name', 'text'),
+
+              select(
+                'Retail category',
+                'category',
+                Object.entries(categories).map(
+                  ([id, item]) => [
+                    id,
+                    item.label
+                  ]
+                )
+              ),
+
+              field('City', 'city', 'text'),
+              field('Neighbourhood', 'area', 'text'),
+              field('Starting month', 'start', 'month'),
+
+              select(
+                'Forecast length',
+                'months',
+                [
+                  [12, '12 months'],
+                  [24, '24 months'],
+                  [36, '36 months']
+                ]
+              )
+            ]
+          )}
+
+          ${block(
+            '2. Starting finances',
+            [
+              field('Owner capital (₦)', 'capital'),
+              field('Loan received (₦)', 'loan'),
+              field('Annual loan interest (%)', 'annualInterest'),
+              field('Loan term (months)', 'loanTerm'),
+              field(
+                'Startup costs excluding opening stock (₦)',
+                'setupCost'
+              )
+            ]
+          )}
+
+          ${block(
+            '3. Sales & inventory',
+            [
+              field('Average selling price (₦)', 'price'),
+              field('Purchase cost per unit (₦)', 'unitCost'),
+              field('Demand per day (units)', 'dailyDemand'),
+              field(
+                'Maximum capacity per day (units)',
+                'dailyCapacity'
+              ),
+              field('Operating days per month', 'openDays'),
+              field('Opening inventory (units)', 'openingUnits'),
+              field(
+                'Stock purchased monthly (units)',
+                'monthlyPurchases'
+              ),
+              field('Monthly inventory loss (%)', 'shrinkage')
+            ]
+          )}
+
+          ${block(
+            '4. Fixed monthly expenses',
+            [
+              field('Rent (₦)', 'rent'),
+              field('Staff salaries (₦)', 'salaries'),
+              field(
+                'Electricity and power (₦)',
+                'electricity'
+              ),
+              field('Other expenses (₦)', 'otherCosts')
+            ]
+          )}
+
+          ${block(
+            '5. Economic exposure',
+            [
+              field(
+                'Fallback annual inflation (%)',
+                'annualInflation'
+              ),
+              field(
+                'Monthly demand growth (%)',
+                'demandGrowth'
+              ),
+              field(
+                'Monthly selling-price growth (%)',
+                'priceGrowth'
+              ),
+              field(
+                'FX-sensitive share of purchases (%)',
+                'fxShare'
+              ),
+              field(
+                'Fuel-sensitive share of purchases (%)',
+                'fuelShare'
+              )
+            ]
+          )}
+        </div>
+
+        <aside class="card pad">
+          <h2>What these inputs mean</h2>
+
+          <p class="hint">
+            Sales are limited by demand,
+            capacity and available inventory.
+            Purchasing stock reduces cash;
+            only stock sold or lost is charged
+            to profit.
+          </p>
+
+          <div class="notice">
+            Changes are saved as a draft in
+            this browser. Go to
+            <b>Simulation</b> to see
+            updated projections.
+          </div>
+
+          <div class="notice warning">
+            The default numbers are illustrative.
+            Historical data is optional and
+            must be sourced and verified separately.
+          </div>
+        </aside>
+      </div>
+    `;
+  }
+
+  // ---------------------------------------
+  // SIMULATION RESULTS PAGE
+  // ---------------------------------------
+
+  function simulation() {
+    const rows = simulate();
+    const s = summary(rows);
+
+    return heading(
+      'Simulation results',
+      'Monthly modelled income, costs, inventory and cash flow.',
+      '<button class="btn" id="exportCSV">Export CSV</button>'
+    ) + `
+      <div class="grid kpis">
+        ${tile('Revenue', short(s.revenue))}
+        ${tile('Profit before tax', short(s.profit))}
+        ${tile('Closing cash', short(s.cash))}
+        ${tile(
+          'Missed sales (units)',
+          Math.round(s.missed).toLocaleString()
+        )}
+      </div>
+
+      <section class="card pad">
+        <div class="inline">
+          <h2>Financial trend</h2>
+
+          <div class="actions">
+            ${['cash', 'sales', 'profit'].map(
+              k => `
+                <button
+                  class="btn"
+                  data-metric="${k}">
+                  ${k}
+                </button>
+              `
+            ).join('')}
+          </div>
+        </div>
+
+        ${chart(rows, chartMetric)}
+      </section>
+
+      <section class="card pad section-gap">
+        <h2>Monthly financial report</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                ${[
+                  'Month',
+                  'Revenue',
+                  'COGS',
+                  'Overhead',
+                  'Loan interest',
+                  'Profit',
+                  'Closing cash',
+                  'Units in stock',
+                  'Missed units'
+                ].map(
+                  h => `<th>${h}</th>`
+                ).join('')}
+              </tr>
+            </thead>
+
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${r.month}</td>
+                  <td>${money(r.sales)}</td>
+                  <td>${money(r.costOfSales)}</td>
+                  <td>${money(r.expenses)}</td>
+                  <td>${money(r.interest)}</td>
+                  <td>${money(r.profit)}</td>
+                  <td>${money(r.cash)}</td>
+                  <td>${Math.round(r.stock)}</td>
+                  <td>${Math.round(r.missed)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <p class="hint">
+          Simplifications: immediate payment
+          for sales and purchases; no taxes,
+          depreciation, accounts receivable,
+          or supplier credit yet.
+        </p>
+      </section>
+    `;
+  }
+
+  // ---------------------------------------
+  // SCENARIOS PAGE
+  // ---------------------------------------
+
+  function scenariosPage() {
+    const base = simulate();
+    const alt = simulate(p, scenario);
+
+    const b = summary(base);
+    const a = summary(alt);
+
+    return heading(
+      'What-if scenarios',
+      'Compare the business with alternative assumptions.'
+    ) + `
+      <div class="scenarios">
+        ${Object.entries(cases).map(
+          ([id, item]) => `
+            <button
+              class="scenario ${scenario === id ? 'selected' : ''}"
+              data-scenario="${id}">
+
+              <strong>${item.label}</strong>
+              <p>${item.detail}</p>
+            </button>
+          `
+        ).join('')}
+      </div>
+
+      ${scenario === 'custom' ? `
+        <section class="card pad section-gap">
+          <h2>Custom changes</h2>
+
+          <div class="form">
+            ${[
+              ['demand', 'Change demand (%)'],
+              ['cost', 'Change purchase costs (%)'],
+              ['price', 'Change sale prices (%)'],
+              ['fixed', 'Change fixed expenses (%)'],
+              ['month', 'Start at month']
+            ].map(
+              ([key, label]) => `
+                <div class="field">
+                  <label>${label}</label>
+
+                  <input
+                    data-custom="${key}"
+                    type="number"
+                    step="any"
+                    value="${p.custom[key]}">
+                </div>
+              `
+            ).join('')}
+          </div>
+        </section>
+      ` : ''}
+
+      <div class="grid kpis section-gap">
+        ${tile('Base profit', short(b.profit))}
+        ${tile('Scenario profit', short(a.profit))}
+        ${tile('Base cash', short(b.cash))}
+        ${tile('Scenario cash', short(a.cash))}
+      </div>
+
+      <section class="card pad">
+        <h2>Cash comparison</h2>
+
+        ${chart(base, 'cash', alt)}
+
+        <p class="hint">
+          Change in total profit:
+          <b>
+            ${money(a.profit - b.profit)}
+          </b>
+        </p>
+      </section>
+    `;
+  }
+
+  // ---------------------------------------
+  // ECONOMIC DATA PAGE
+  // ---------------------------------------
+
+  function economicData() {
+    const s = DB.status();
+
+    return heading(
+      'Economic data',
+      'Load annual inflation or import verified historical monthly observations.'
+    ) + `
+      <div class="grid two">
+        <div class="stack">
+
+          <section class="card pad">
+            <h2>World Bank annual CPI inflation</h2>
+
+            <p class="hint">
+              Fetch Nigeria's annual inflation
+              series from the World Bank.
+              When used for monthly projections
+              it is converted to a monthly-equivalent
+              estimate, not treated as observed
+              monthly inflation.
+            </p>
+
+            <button
+              class="btn primary"
+              id="fetchWB">
+              Fetch annual inflation
+            </button>
+
+            <p class="hint">
+              Annual observations cached:
+              ${s.years}
+            </p>
+          </section>
+
+          <section class="card pad">
+            <h2>Import historical monthly CSV</h2>
+
+            <p class="hint">
+              Paste CSV with columns:
+              <code>metric,month,value,source</code>.
+              Accepted metrics:
+              <code>cpi_mom</code>,
+              <code>cpi_yoy</code>,
+              <code>fx_ngn_usd</code>,
+              <code>petrol_ngn_litre</code>.
+            </p>
+
+            <div class="field">
+              <textarea
+                id="csvInput"
+                placeholder="metric,month,value,source&#10;petrol_ngn_litre,2023-01,REPLACE_WITH_REAL_VALUE,NBS"></textarea>
+            </div>
+
+            <div class="actions section-gap">
+              <button
+                class="btn primary"
+                id="importCSV">
+                Import CSV
+              </button>
+
+              <button
+                class="btn danger"
+                id="clearData">
+                Clear monthly records
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <section class="card pad">
+          <h2>Data status</h2>
+
+          <p>
+            Monthly records loaded:
+            <b>${s.records}</b>
+          </p>
+
+          <p>
+            Annual CPI observations:
+            <b>${s.years}</b>
+          </p>
+
+          <div class="notice warning">
+            User-imported values are not
+            independently verified.
+            Missing FX or petrol observations
+            do not trigger estimated historical
+            shocks; the model flags them in
+            its calculations.
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  // ---------------------------------------
+  // SAVED PROJECTS PAGE
+  // ---------------------------------------
+
+  function saved() {
+    const items = read(SAVE_KEY, []);
+
+    return heading(
+      'Saved projects',
+      'Stored in this browser only; not synchronised to GitHub or other devices.',
+      '<button class="btn primary" id="newProject">New project</button>'
+    ) + `
+      <section class="card pad">
+        <h2>Saved businesses (${items.length})</h2>
+
+        <div class="stack">
+          ${items.length
+            ? items.map(
+                (r, i) => `
+                  <div class="saved-item">
+                    <div>
+                      <b>${escape(r.name)}</b>
+
+                      <small>
+                        ${escape(
+                          categories[r.category]?.label ||
+                          'Retail'
+                        )}
+                        • ${escape(r.city)}
+                      </small>
+                    </div>
+
+                    <div class="actions">
+                      <button
+                        class="btn"
+                        data-open="${i}">
+                        Open
+                      </button>
+
+                      <button
+                        class="btn danger"
+                        data-remove="${i}">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                `
+              ).join('')
+            : `
+              <p class="hint">
+                Nothing saved yet.
+                Click Save project in the top bar.
+              </p>
+            `}
+        </div>
+      </section>
+    `;
+  }
+
+  // ---------------------------------------
+  // RENDERING AND NAVIGATION
+  // ---------------------------------------
+
+  const views = {
+    dashboard,
+    setup,
+    simulation,
+    scenarios: scenariosPage,
+    data: economicData,
+    saved
+  };
+
+  function render() {
+    $('pageTitle').textContent =
+      names[page];
+
+    document.querySelectorAll(
+      '[data-page]'
+    ).forEach(
+      btn => btn.classList.toggle(
+        'active',
+        btn.dataset.page === page
+      )
+    );
+
+    $('content').innerHTML =
+      views[page]();
+  }
+
+  function saveProject() {
+    const items = read(SAVE_KEY, []);
+
+    p.id ||= String(Date.now());
+
+    const at = items.findIndex(
+      r => r.id === p.id
+    );
+
+    if (at === -1) {
+      items.unshift(
+        structuredClone(p)
+      );
+    } else {
+      items[at] =
+        structuredClone(p);
+    }
+
+    store(SAVE_KEY, items);
+    store(DRAFT_KEY, p);
+
+    toast(
+      'Project saved in this browser'
+    );
+  }
+
+  function downloadCSV() {
+    const rows = simulate();
+
+    const keys = [
+      'month',
+      'sales',
+      'costOfSales',
+      'expenses',
+      'interest',
+      'profit',
+      'cash',
+      'purchaseCash',
+      'stock',
+      'inventoryValue',
+      'sold',
+      'missed',
+      'debt',
+      'cpiStatus'
+    ];
+
+    const csv = [
+      keys.join(','),
+      ...rows.map(
+        r => keys.map(
+          k => r[k]
+        ).join(',')
+      )
+    ].join('\n');
+
+    const url = URL.createObjectURL(
+      new Blob(
+        [csv],
+        { type: 'text/csv' }
+      )
+    );
+
+    const a = document.createElement('a');
+
+    a.href = url;
+    a.download =
+      'simvest-retail-simulation.csv';
+
+    a.click();
+
+    setTimeout(
+      () => URL.revokeObjectURL(url),
+      1000
+    );
+  }
+
+  // ---------------------------------------
+  // EVENT LISTENERS
+  // ---------------------------------------
+
+  $('navigation').addEventListener(
+    'click',
+    event => {
+      const btn = event.target.closest(
+        '[data-page]'
+      );
+
+      if (!btn) return;
+
+      page = btn.dataset.page;
+
+      $('sidebar').classList.remove(
+        'open'
+      );
+
+      render();
+    }
+  );
+
+  $('menuButton').addEventListener(
+    'click',
+    () => $('sidebar').classList.toggle(
+      'open'
+    )
+  );
+
+  $('saveButton').addEventListener(
+    'click',
+    saveProject
+  );
+
+  $('content').addEventListener(
+    'change',
+    event => {
+      const input = event.target;
+
+      if (input.dataset.key) {
+        const key = input.dataset.key;
+
+        const value =
+          input.type === 'number'
+            ? Number(input.value)
+            : input.value;
+
+        if (key === 'category') {
+          const c = categories[value];
+
+          Object.assign(
+            p,
+            {
+              category: value,
+              price: c.price,
+              unitCost: c.cost,
+              dailyDemand: c.demand,
+              dailyCapacity: c.capacity,
+              openingUnits: c.stock,
+              monthlyPurchases: c.buy
+            }
+          );
+
+          render();
+        } else {
+          p[key] = value;
+        }
+
+        store(DRAFT_KEY, p);
+      }
+
+      if (input.dataset.custom) {
+        p.custom[input.dataset.custom] =
+          Number(input.value);
+
+        store(DRAFT_KEY, p);
+        render();
+      }
+    }
+  );
+
+  $('content').addEventListener(
+    'click',
+    async event => {
+      const btn = event.target.closest(
+        'button'
+      );
+
+      if (!btn) return;
+
+      if (btn.dataset.goto) {
+        page = btn.dataset.goto;
+        render();
+
+      } else if (btn.dataset.metric) {
+        chartMetric = btn.dataset.metric;
+        render();
+
+      } else if (btn.dataset.scenario) {
+        scenario = btn.dataset.scenario;
+        render();
+
+      } else if (btn.id === 'exportCSV') {
+        downloadCSV();
+
+      } else if (btn.id === 'fetchWB') {
+        btn.disabled = true;
+        btn.textContent = 'Fetching…';
+
+        try {
+          const count =
+            await DB.fetchWorldBank();
+
+          toast(
+            'Loaded ' +
+            count +
+            ' annual observations'
+          );
+
+          render();
+
+        } catch (err) {
+          toast(
+            'Unable to fetch: ' +
+            err.message
+          );
+
+          btn.disabled = false;
+          btn.textContent =
+            'Fetch annual inflation';
+        }
+
+      } else if (btn.id === 'importCSV') {
+        try {
+          const count = DB.importCSV(
+            $('csvInput').value
+          );
+
+          toast(
+            'Imported ' +
+            count +
+            ' observations'
+          );
+
+          render();
+
+        } catch (err) {
+          toast(err.message);
+        }
+
+      } else if (btn.id === 'clearData') {
+        if (confirm(
+          'Delete all imported monthly economic records?'
+        )) {
+          DB.clear();
+          render();
+        }
+
+      } else if (btn.id === 'newProject') {
+        p = structuredClone(defaults);
+
+        store(DRAFT_KEY, p);
+
+        page = 'setup';
+        render();
+
+      } else if (
+        btn.dataset.open !== undefined
+      ) {
+        const item = read(
+          SAVE_KEY,
+          []
+        )[Number(btn.dataset.open)];
+
+        if (item) {
+          p = {
+            ...defaults,
+            ...item,
+            custom: {
+              ...defaults.custom,
+              ...item.custom
+            }
+          };
+
+          store(DRAFT_KEY, p);
+
+          page = 'dashboard';
+          render();
+        }
+
+      } else if (
+        btn.dataset.remove !== undefined &&
+        confirm('Delete this project?')
+      ) {
+        const items = read(
+          SAVE_KEY,
+          []
+        );
+
+        items.splice(
+          Number(btn.dataset.remove),
+          1
+        );
+
+        store(SAVE_KEY, items);
+        render();
+      }
+    }
+  );
+
+  // Start SimVest
+  render();
+
 })();
